@@ -4,7 +4,8 @@
   "description": "TerriMind MVP — генерация кварталов и расчёт ТЭП",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test --experimental-vm-modules test/",
+    "test:unit": "node --test test/unit/",
     "start": "electron .",
     "dist": "electron-builder --win"
   },
@@ -36,7 +37,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -53,6 +56,7 @@
   "dependencies": {
     "@turf/turf": "^6.5.0",
     "leaflet": "^1.9.4",
-    "leaflet-draw": "^1.0.4"
+    "leaflet-draw": "^1.0.4",
+    "pdfjs-dist": "^4.7.76"
   }
 }
