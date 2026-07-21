@@ -9,6 +9,14 @@ async function getPdfjs() {
   if (_pdfjs) return _pdfjs;
   // legacy build работает в Node без DOM
   _pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  // Указываем worker-скрипт (в Node pdfjs запускает fake-worker в этом же потоке).
+  try {
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+    const { pathToFileURL } = await import('node:url');
+    _pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
+  } catch (e) { /* fallback: main-thread */ }
   return _pdfjs;
 }
 

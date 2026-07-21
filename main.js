@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const licensing = require('./licensing');
 const activationStore = require('./activation-store');
+const { DocumentStore } = require('./js/repositories/documents/documentStore.js');
 
 const APP_VERSION = app.getVersion();
 
@@ -385,6 +386,134 @@ function buildReportHTML(p) {
   <div class="foot">TerriMind • градостроительный расчёт • офлайн-режим</div>
 </body></html>`;
 }
+
+// ============================================================
+// ЭТАП 3: Нормативная база (PDF) — хранилище + фоновый анализ
+// ============================================================
+
+let docStore = null;
+function getDocStore() {
+  if (!docStore) {
+    docStore = new DocumentStore(path.join(app.getPath('userData'), 'regulations'));
+  }
+  return docStore;
+}
+
+let pdfWorker = null;
+const workerCallbacks = new Map();
+const analyzingIds = new Set();
+
+function getPdfWorker() {
+  if (pdfWorker) return pdfWorker;
+  pdfWorker = utilityProcess.fork(path.join(__dirname, 'js', 'workers', 'pdf-worker.js'));
+  pdfWorker.on('message', (msg) => {
+    if (!msg || !msg.id) return;
+    if (msg.type === 'progress') {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('pdf-progress', { id: msg.id, page: msg.page, total: msg.total });
+      }
+      return;
+    }
+    const cb = workerCallbacks.get(msg.id);
+    if (!cb) return;
+    if (msg.type === 'done') { workerCallbacks.delete(msg.id); analyzingIds.delete(msg.id); cb.resolve(msg.result); }
+    else if (msg.type === 'error') { workerCallbacks.delete(msg.id); analyzingIds.delete(msg.id); cb.reject(new Error(msg.error)); }
+  });
+  pdfWorker.on('exit', () => { pdfWorker = null; });
+  return pdfWorker;
+}
+
+function analyzeInWorker(id, pdfPath, meta) {
+  return new Promise((resolve, reject) => {
+    if (analyzingIds.has(id)) { reject(new Error('Документ уже анализируется')); return; }
+    analyzingIds.add(id);
+    workerCallbacks.set(id, { resolve, reject });
+    getPdfWorker().postMessage({ type: 'analyze', job: { id, path: pdfPath, meta } });
+  });
+}
+
+const PDF_MAX_BYTES = 100 * 1024 * 1024;
+function validatePdfBuffer(buffer, name) {
+  if (!/\.pdf$/i.test(name || '')) return { ok: false, reason: 'Расширение не .pdf' };
+  if (buffer.length > PDF_MAX_BYTES) return { ok: false, reason: 'Файл превышает лимит 100 МБ' };
+  if (buffer.length < 5 || buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
+    return { ok: false, reason: 'Файл не является PDF (нет сигнатуры %PDF-)' };
+  }
+  return { ok: true };
+}
+
+ipcMain.handle('reg-import-pdfs', async () => {
+  const win = BrowserWindow.getFocusedWindow();
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Загрузить нормативные PDF',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'PDF', extensions: ['pdf'] }]
+  });
+  if (canceled || !filePaths || !filePaths.length) return { ok: false, canceled: true };
+  const store = getDocStore();
+  const added = [], errors = [];
+  for (const fp of filePaths) {
+    try {
+      const buffer = fs.readFileSync(fp);
+      const check = validatePdfBuffer(buffer, fp);
+      if (!check.ok) { errors.push({ file: path.basename(fp), reason: check.reason }); continue; }
+      added.push(store.addDocument(buffer, { originalName: path.basename(fp) }));
+    } catch (e) { errors.push({ file: path.basename(fp), reason: e.message }); }
+  }
+  return { ok: true, added, errors };
+});
+
+ipcMain.handle('reg-add-pdf-buffers', async (event, files) => {
+  const store = getDocStore();
+  const added = [], errors = [];
+  for (const f of files || []) {
+    try {
+      const buffer = Buffer.from(f.data, 'base64');
+      const check = validatePdfBuffer(buffer, f.name);
+      if (!check.ok) { errors.push({ file: f.name, reason: check.reason }); continue; }
+      added.push(store.addDocument(buffer, { originalName: f.name }));
+    } catch (e) { errors.push({ file: f && f.name, reason: e.message }); }
+  }
+  return { ok: true, added, errors };
+});
+
+ipcMain.handle('reg-analyze', async (event, id) => {
+  const store = getDocStore();
+  const pdfPath = store.getPdfPath(id);
+  if (!pdfPath || !fs.existsSync(pdfPath)) return { ok: false, error: 'Файл документа не найден' };
+  const doc = store.getDocument(id, { withIndex: false });
+  try {
+    const result = await analyzeInWorker(id, pdfPath, {
+      documentName: doc && doc.title,
+      documentDate: doc && doc.documentDate,
+      documentRevision: doc && doc.documentRevision
+    });
+    if (result.hasTextLayer === false) {
+      store.setAnalysis(id, { error: 'Документ не содержит текстового слоя (нужен OCR)' });
+      return { ok: true, hasTextLayer: false, note: 'no_text_layer' };
+    }
+    store.setAnalysis(id, result);
+    return { ok: true, hasTextLayer: true, ruleCount: (result.rules || []).length, pageCount: result.pageCount };
+  } catch (e) {
+    store.setAnalysis(id, { error: e.message });
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('reg-cancel-analyze', async (event, id) => {
+  if (pdfWorker) pdfWorker.postMessage({ type: 'cancel', id });
+  return { ok: true };
+});
+ipcMain.handle('reg-list', async () => ({ ok: true, documents: getDocStore().listDocuments() }));
+ipcMain.handle('reg-get', async (event, id) => ({ ok: true, document: getDocStore().getDocument(id, { withIndex: true }) }));
+ipcMain.handle('reg-update-meta', async (event, id, patch) => {
+  const doc = getDocStore().updateMeta(id, patch || {});
+  return doc ? { ok: true, document: doc } : { ok: false, error: 'Документ не найден' };
+});
+ipcMain.handle('reg-remove', async (event, id) => ({ ok: getDocStore().removeDocument(id) }));
+ipcMain.handle('reg-active-rules', async () => ({ ok: true, rules: getDocStore().allActiveRules() }));
+ipcMain.handle('reg-integrity', async () => ({ ok: true, report: getDocStore().verifyIntegrity() }));
+ipcMain.handle('reg-cleanup', async () => ({ ok: true, removed: getDocStore().cleanupOrphans() }));
 
 // v5: окно активации (Этап 1). Frameless, компактное, поверх — до главного окна.
 function createActivationWindow() {

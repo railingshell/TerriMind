@@ -19,6 +19,24 @@ contextBridge.exposeInMainWorld('terrimind', {
   sendCloseSaveResult: (ok) => ipcRenderer.send('close-save-result', ok)
 });
 
+// ЭТАП 3: Нормативная база (PDF) — безопасный локальный API
+contextBridge.exposeInMainWorld('terrireg', {
+  importPdfs: () => ipcRenderer.invoke('reg-import-pdfs'),
+  addPdfBuffers: (files) => ipcRenderer.invoke('reg-add-pdf-buffers', files),
+  analyze: (id) => ipcRenderer.invoke('reg-analyze', id),
+  cancelAnalyze: (id) => ipcRenderer.invoke('reg-cancel-analyze', id),
+  list: () => ipcRenderer.invoke('reg-list'),
+  get: (id) => ipcRenderer.invoke('reg-get', id),
+  updateMeta: (id, patch) => ipcRenderer.invoke('reg-update-meta', id, patch),
+  remove: (id) => ipcRenderer.invoke('reg-remove', id),
+  activeRules: () => ipcRenderer.invoke('reg-active-rules'),
+  integrity: () => ipcRenderer.invoke('reg-integrity'),
+  cleanup: () => ipcRenderer.invoke('reg-cleanup'),
+  onProgress: (callback) => {
+    ipcRenderer.on('pdf-progress', (e, data) => callback(data));
+  }
+});
+
 // Лицензирование/активация (v5): минимальный безопасный API
 contextBridge.exposeInMainWorld('terrilicense', {
   // Экран активации

@@ -4,8 +4,8 @@
   "description": "TerriMind MVP — генерация кварталов и расчёт ТЭП",
   "main": "main.js",
   "scripts": {
-    "test": "node --test --experimental-vm-modules test/",
-    "test:unit": "node --test test/unit/",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "test:unit": "node --test \"test/unit/**/*.test.mjs\"",
     "start": "electron .",
     "dist": "electron-builder --win"
   },
@@ -27,7 +27,10 @@
       "activation-ui.js",
       "node_modules/leaflet/**/*",
       "node_modules/leaflet-draw/**/*",
-      "node_modules/@turf/**/*"
+      "node_modules/@turf/**/*",
+      "node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+      "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "node_modules/pdfjs-dist/package.json"
     ],
     "directories": {
       "output": "dist",
