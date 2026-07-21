@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline';" />
+  <title>Активация TerriMind</title>
+  <style>
+    :root {
+      --bg: #0A0A0B;
+      --surface: #161618;
+      --surface-2: #1D1D20;
+      --border: #232326;
+      --border-strong: #333338;
+      --text: #F2F2F3;
+      --text-muted: #8E8E94;
+      --text-faint: #5C5C63;
+      --accent: #E08A4B;
+      --accent-hover: #EC9A5E;
+      --accent-text: #14100c;
+      --font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: var(--font);
+      background:
+        radial-gradient(900px 500px at 50% -8%, rgba(224,138,75,.10), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      width: 380px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px 34px 32px;
+      box-shadow: 0 30px 70px rgba(0,0,0,.6);
+      text-align: center;
+    }
+    .logo {
+      width: 56px; height: 56px; border-radius: 18px;
+      background: linear-gradient(135deg, var(--accent), #F0A868);
+      display: grid; place-items: center; margin: 0 auto 22px;
+      box-shadow: 0 10px 28px rgba(224,138,75,.32);
+    }
+    .logo svg { width: 30px; height: 30px; }
+    .brand {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -.4px;
+      margin: 0 0 8px;
+    }
+    .brand .dot { color: var(--accent); }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0 0 28px;
+    }
+    .field { text-align: left; margin-bottom: 16px; }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    input {
+      width: 100%;
+      padding: 13px 15px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      letter-spacing: .4px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input::placeholder { color: var(--text-faint); letter-spacing: normal; }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(224,138,75,.16);
+    }
+    button {
+      width: 100%;
+      margin-top: 6px;
+      padding: 14px;
+      background: var(--accent);
+      color: var(--accent-text);
+      border: none;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+    }
+    button:hover:not(:disabled) { background: var(--accent-hover); }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled { opacity: .5; cursor: default; }
+    .status {
+      margin-top: 16px;
+      min-height: 18px;
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .status.error { color: #ff7b7b; }
+    .status.ok { color: #4cd08a; }
+    .status.info { color: var(--text-muted); }
+    .foot {
+      margin-top: 26px;
+      font-size: 12px;
+      color: var(--text-faint);
+      text-align: center;
+    }
+    .foot a { color: var(--text-muted); text-decoration: none; border-bottom: 1px solid var(--border-strong); }
+    .foot a:hover { color: var(--accent); border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#14100c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l9-3 9 3-9 3-9-3zM3 6v12l9 3M21 6v12l-9 3M12 9v12"/></svg>
+    </div>
+    <h1 class="brand">Terri<span class="dot">Mind</span></h1>
+    <p class="subtitle">Введите токен активации для доступа к приложению.</p>
+
+    <div class="field">
+      <label for="token">Токен активации</label>
+      <input id="token" type="text" placeholder="XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
+    </div>
+
+    <div class="field">
+      <label for="projectName">Имя проекта <span style="color:var(--text-faint)">(необязательно)</span></label>
+      <input id="projectName" type="text" placeholder="Например: Микрорайон Заречный" autocomplete="off" />
+    </div>
+
+    <button id="activateBtn">Активировать</button>
+
+    <div id="status" class="status info"></div>
+
+    <div class="foot">Нет токена? <a href="#" id="contactLink">Написать нам</a></div>
+  </div>
+
+  <script src="./activation-ui.js"></script>
+</body>
+</html>
