@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://*.tile.openstreetmap.org; font-src 'self' data:;" />
   <title>TerriMind</title>
   <link rel="stylesheet" href="./node_modules/leaflet/dist/leaflet.css" />
   <link rel="stylesheet" href="./node_modules/leaflet-draw/dist/leaflet.draw.css" />
@@ -520,6 +521,53 @@
       #sidebar { width: 250px; min-width: 250px; }
       #map { margin: var(--sp-2); }
     }
+
+    /* ── Панель слоёв (redesign) ── */
+    .layer-group { margin-bottom: var(--sp-3); }
+    .layer-group:last-child { margin-bottom: 0; }
+    .layer-group-title {
+      font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-faint); font-weight: 600; margin: var(--sp-2) 0 var(--sp-1);
+    }
+    .layer-item {
+      display: flex; align-items: center; gap: var(--sp-2);
+      padding: 6px 4px; border-radius: var(--r-sm);
+      transition: background var(--trans);
+    }
+    .layer-item:hover { background: var(--surface-2); }
+    .layer-item.hidden-layer { opacity: .45; }
+    .layer-item.locked-layer .li-name { color: var(--text-faint); }
+    .layer-item .li-swatch {
+      width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0;
+      border: 1px solid rgba(0,0,0,.15);
+    }
+    .layer-item .li-name { flex: 1; font-size: var(--fs-md); color: var(--text); }
+    .layer-item .li-btn {
+      width: 26px; height: 26px; border: none; background: transparent;
+      color: var(--text-muted); cursor: pointer; border-radius: var(--r-sm);
+      display: grid; place-items: center; transition: color var(--trans), background var(--trans);
+    }
+    .layer-item .li-btn:hover { color: var(--text); background: var(--surface-hover); }
+    .layer-item .li-btn svg { width: 15px; height: 15px; }
+    .layer-item .li-eye.off { color: var(--text-faint); }
+    .layer-item .li-lock.on { color: var(--accent); }
+    .layer-item .li-opacity {
+      width: 56px; flex-shrink: 0; accent-color: var(--accent); cursor: pointer;
+    }
+
+    /* Zones legend */
+    #zonesLegend .row { font-size: var(--fs-md); margin: 5px 0; }
+
+    /* Toast kinds */
+    .toast-ok { border-color: var(--ok); }
+    .toast-error { border-color: var(--danger); color: var(--danger); }
+    .toast-info { border-color: var(--border); }
+
+    /* Кнопка активного режима */
+    .btn.active {
+      background: var(--accent) !important; color: var(--accent-text) !important;
+      border-color: var(--accent) !important;
+    }
   </style>
 </head>
 <body class="dark" data-tab="site">
@@ -614,6 +662,14 @@
           <span class="label">Угол поворота, °</span>
           <input type="number" id="gridAngle" value="0" min="0" max="90" step="5" />
         </div>
+        <label class="layer-row" style="margin:6px 0">
+          <span class="layer-name">Авто-размер кварталов</span>
+          <input type="checkbox" id="autoSize" />
+        </label>
+        <label class="layer-row" style="margin:6px 0">
+          <span class="layer-name">Авто-направление сетки</span>
+          <input type="checkbox" id="autoAngle" />
+        </label>
         <div class="row">
           <span class="label">Средняя этажность</span>
           <input type="number" id="floors" value="9" min="1" step="1" />
@@ -631,6 +687,7 @@
           <input type="number" id="areaPerPerson" value="30" min="1" step="1" />
         </div>
         <button id="generateBtn" class="btn btn-accent" disabled>Сгенерировать кварталы</button>
+        <button id="editParcelBtn" class="btn" disabled>Редактировать участок</button>
         <button id="traceRoadBtn" class="btn" disabled>Провести дорогу</button>
         <button id="autoConnectBtn" class="btn" disabled>Авто-выходы к дорогам</button>
         <button id="innerProfilesBtn" class="btn" disabled>Внутриквартальные профили</button>
@@ -680,53 +737,22 @@
           <button id="exportPdfBtn" class="btn btn-ghost">Отчёт PDF</button>
         </div>
         <p class="hint">Проект (.terrimind.json) хранит геометрию и параметры. Фон карты (OSM) требует интернет.</p>
+        <p class="hint" id="autosaveStatus" style="margin-top:var(--sp-1)"></p>
       </div>
 
       <!-- Слои -->
       <div class="card" data-section="result">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg>Слои</h3>
-        <label class="layer-row">
-          <span class="swatch" style="background:#e67e22"></span>
-          <span class="layer-name">Участок</span>
-          <input type="checkbox" id="toggleParcel" checked />
-        </label>
-        <label class="layer-row">
-          <span class="swatch" style="background:#3498db"></span>
-          <span class="layer-name">Кварталы</span>
-          <input type="checkbox" id="toggleBlocks" checked />
-        </label>
-        <label class="layer-row">
-          <span class="swatch" style="background:#3d4451"></span>
-          <span class="layer-name">Дороги</span>
-          <input type="checkbox" id="toggleRoads" checked />
-        </label>
-        <label class="layer-row">
-          <span class="swatch" style="background:#cfcbc3"></span>
-          <span class="layer-name">Дорожки/тротуары</span>
-          <input type="checkbox" id="toggleInner" checked />
-        </label>
-        <label class="layer-row">
-          <span class="swatch" style="background:#111827"></span>
-          <span class="layer-name">Номера кварталов</span>
-          <input type="checkbox" id="toggleLabels" checked />
-        </label>
+        <div id="layersPanel"></div>
+        <!-- legacy toggle: скрыт, но нужен для совместимости логики номеров -->
+        <input type="checkbox" id="toggleLabels" checked hidden />
       </div>
 
       <!-- Зоны -->
       <div class="card" data-section="result">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Зоны застройки</h3>
-        <div class="layer-row legend-only">
-          <span class="swatch" style="background:#3498db"></span>
-          <span class="layer-name">Жилая</span>
-        </div>
-        <div class="layer-row legend-only">
-          <span class="swatch" style="background:#e67e22"></span>
-          <span class="layer-name">Общественная</span>
-        </div>
-        <div class="layer-row legend-only">
-          <span class="swatch" style="background:#27ae60"></span>
-          <span class="layer-name">Озеленение</span>
-        </div>
+        <div id="zonesLegend"></div>
+        <p class="hint">Клик по кварталу переключает зону.</p>
       </div>
 
       <!-- Лицензия -->
@@ -753,116 +779,7 @@
   <script src="./node_modules/leaflet/dist/leaflet.js"></script>
   <script src="./node_modules/leaflet-draw/dist/leaflet.draw.js"></script>
   <script src="./node_modules/@turf/turf/turf.min.js"></script>
-  <script src="./map.js"></script>
-  <script>
-    // ── UI-only: тема, сворачивание, статус, пустое состояние ──
-    // Не трогает map.js/логику. Читает существующие элементы по id.
-    (function () {
-      var root = document.documentElement;
-      var body = document.body;
-
-      // Тема (сохраняется в localStorage)
-      var THEME_KEY = 'terrimind.theme';
-      function applyTheme(t) {
-        root.setAttribute('data-theme', t);
-        body.className = body.className.replace(/\b(light|dark)\b/g, '').trim() + ' ' + t;
-        var icon = document.getElementById('themeIcon');
-        if (icon) {
-          if (t === 'dark') {
-            icon.innerHTML = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
-          } else {
-            icon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
-          }
-        }
-      }
-      var saved = 'dark';
-      try { saved = localStorage.getItem(THEME_KEY) || 'dark'; } catch (e) {}
-      applyTheme(saved);
-      var tt = document.getElementById('themeToggle');
-      if (tt) tt.addEventListener('click', function () {
-        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        applyTheme(next);
-        try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
-        try { if (window.map && window.map.invalidateSize) setTimeout(function(){ window.map.invalidateSize(); }, 160); } catch (e) {}
-      });
-
-      // Сворачивание сайдбара
-      var cb = document.getElementById('collapseBtn');
-      if (cb) cb.addEventListener('click', function () {
-        body.classList.toggle('sidebar-collapsed');
-        try { if (window.map && window.map.invalidateSize) setTimeout(function(){ window.map.invalidateSize(); }, 160); } catch (e) {}
-      });
-
-      // Кнопка «Я понял» в подсказке пустого состояния
-      var esOk = document.getElementById('emptyStateOk');
-      var esBox = document.getElementById('emptyState');
-      if (esOk && esBox) esOk.addEventListener('click', function () {
-        esBox.classList.add('dismissed');
-      });
-
-      // Pill-табы разделов: переключают видимость карточек (чисто UI)
-      var tabs = document.getElementById('sectionTabs');
-      var rail = document.getElementById('navRail');
-      if (tabs) {
-        var pills = tabs.querySelectorAll('.pill');
-        var navBtns = rail ? rail.querySelectorAll('.nav-btn') : [];
-        function activateTab(section) {
-          body.setAttribute('data-tab', section);
-          pills.forEach(function (p) {
-            p.classList.toggle('active', p.getAttribute('data-section') === section);
-          });
-          navBtns.forEach(function (b) {
-            b.classList.toggle('active', b.getAttribute('data-nav') === section);
-          });
-          // если сайдбар свёрнут — раскрыть при выборе раздела через rail
-          if (body.classList.contains('sidebar-collapsed')) {
-            body.classList.remove('sidebar-collapsed');
-            try { if (window.map && window.map.invalidateSize) setTimeout(function(){ window.map.invalidateSize(); }, 160); } catch (e) {}
-          }
-        }
-        pills.forEach(function (p) {
-          p.addEventListener('click', function () {
-            activateTab(p.getAttribute('data-section'));
-          });
-        });
-        navBtns.forEach(function (b) {
-          b.addEventListener('click', function () {
-            activateTab(b.getAttribute('data-nav'));
-          });
-        });
-        activateTab('site');
-      }
-
-      // Статус проекта в топбаре: следим за document.title (● = грязный).
-      // map.js управляет document.title — используем его как источник правды.
-      var chip = document.getElementById('statusChip');
-      var stext = document.getElementById('statusText');
-      function syncStatus() {
-        var dirty = document.title.indexOf('●') === 0;
-        if (chip) chip.classList.toggle('dirty', dirty);
-        if (stext) stext.textContent = dirty ? 'Есть изменения' : 'Сохранено';
-      }
-      syncStatus();
-      // Наблюдаем за изменением <title>
-      var titleEl = document.querySelector('title');
-      if (titleEl && window.MutationObserver) {
-        new MutationObserver(syncStatus).observe(titleEl, { childList: true });
-      }
-
-      // Пустое состояние: скрыть, когда появился участок.
-      // Отслеживаем появление слоёв в #map (leaflet рисует overlay).
-      function checkParcel() {
-        // эвристика: если disabled снят с clearBtn — участок есть
-        var clearBtn = document.getElementById('clearBtn');
-        var has = clearBtn && !clearBtn.disabled;
-        body.classList.toggle('has-parcel', !!has);
-      }
-      checkParcel();
-      var clearBtn = document.getElementById('clearBtn');
-      if (clearBtn && window.MutationObserver) {
-        new MutationObserver(checkParcel).observe(clearBtn, { attributes: true, attributeFilter: ['disabled'] });
-      }
-    })();
-  </script>
+  <script type="module" src="./js/app.js"></script>
+  <script defer src="./js/ui/chrome.js"></script>
 </body>
 </html>

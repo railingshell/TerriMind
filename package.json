@@ -19,7 +19,7 @@
       "main.js",
       "preload.js",
       "index.html",
-      "map.js",
+      "js/**/*",
       "licensing.js",
       "activation-store.js",
       "activation.html",
