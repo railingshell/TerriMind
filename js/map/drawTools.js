@@ -9,6 +9,8 @@ import { notifyError, notifyInfo } from '../core/toast.js';
 import { generateBlocks, renumber } from '../geometry/blockGenerator.js';
 import { buildGridAxes, buildRoads, autoConnect, carveRoadsFromBlocks } from '../geometry/roadEngine.js';
 import { buildInnerProfiles } from '../geometry/innerProfiles.js';
+import { regenerateAllPlots } from '../geometry/plotGenerator.js';
+import { generateAllBuildings } from '../geometry/buildingGenerator.js';
 import { renderAll, clearRenderLayers } from './render.js';
 import { updateParcelArea, updateStats } from '../project/stats.js';
 import { attachParcelEditing } from './parcelEdit.js';
@@ -80,11 +82,14 @@ export function doGenerate() {
   state.roadAxes = buildGridAxes(parcel, grid, opts.streetWidth);
   rebuildRoads();
 
+  // Участки и здания (Промпт 1.1–1.2)
+  regenerateAllPlots();
+  generateAllBuildings();
+
   renderAll();
   updateStats();
   syncButtons();
   markDirty();
-  console.log('Сгенерировано кварталов:', blocks.length, 'за', Math.round(performance.now() - t0), 'мс');
 }
 
 // Перестроить дороги-полигоны из осей (+ carve service из кварталов)

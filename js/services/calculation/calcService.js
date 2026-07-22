@@ -11,6 +11,7 @@ import { getNum } from '../../core/dom.js';
 import { buildMetricsInput } from './buildMetricsInput.js';
 import { computeMetrics } from '../../domain/metrics/computeMetrics.js';
 import { getRegModel } from '../../renderer/features/regulations/regModel.js';
+import { getBuildingParams } from '../../project/params.js';
 
 // Последний результат расчёта (для UI/экспорта/экономики)
 let lastMetrics = null;
@@ -72,9 +73,22 @@ export function collectProject() {
       areaPerPerson: getNum('areaPerPerson', 30),
       householdSize: getNum('householdSize', 2.5),
       avgFlatM2: getNum('avgFlatM2', 55),
-      dayNightRatio: 1.15
+      dayNightRatio: 1.15,
+      apartmentMix: getBuildingParams().apartmentMix
     },
-    fart: reg ? reg.fartComposition() : {}
+    fart: reg ? reg.fartComposition() : {},
+    // Реальные здания (если были сгенерированы в buildingGenerator)
+    realBuildings: Object.values(state.buildings).filter(Boolean).map(bld => {
+      const p = bld.properties || {};
+      return {
+        footprintArea:   p.footprintArea   || 0,
+        totalFloorArea:  p.totalFloorArea  || 0,
+        residentialArea: p.residentialArea || 0,
+        commercialArea:  p.commercialArea  || 0,
+        floors:          p.floors          || 1,
+        blockId:         p.blockId         || ''
+      };
+    })
   };
 }
 

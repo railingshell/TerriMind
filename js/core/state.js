@@ -16,9 +16,16 @@ export const state = {
   roads: null,             // общий полигон дорог (совместимость)
   innerRoads: [],          // Feature[] внутриквартальные дорожки/тротуары
 
+  // Участки, дворы, здания (Промпт 1.1–1.2)
+  plots:      {},          // { [blockId]: Plot[] }     — земельные участки
+  courtyards: {},          // { [blockId]: Feature }    — дворы
+  buildings:  {},          // { [plotId]: Building }    — пятна зданий
+
   // Флаги
   dirty: false,            // несохранённые изменения
   showLabels: true,        // показывать номера кварталов
+  showPlots: true,         // показывать участки
+  showBuildings: true,     // показывать здания
   currentProjectPath: null // путь текущего .terrimind.json (для автосейва)
 };
 
@@ -31,6 +38,9 @@ export function resetGenerated() {
   state.roadsService = null;
   state.roads = null;
   state.innerRoads = [];
+  state.plots      = {};
+  state.courtyards = {};
+  state.buildings  = {};
 }
 
 // Полный сброс

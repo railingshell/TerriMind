@@ -19,9 +19,16 @@ import { initLayersPanel } from './ui/layersPanel.js';
 import { initDirtyIndicator } from './ui/dirtyIndicator.js';
 import { initLicensePanel } from './ui/licensePanel.js';
 import { getRegModel } from './renderer/features/regulations/regModel.js';
+import { loadBuildingParams } from './project/params.js';
+import { initBuildingPanel } from './ui/buildingPanel.js';
+import { regenerateAllPlots } from './geometry/plotGenerator.js';
+import { generateAllBuildings } from './geometry/buildingGenerator.js';
+import { renderPlots, renderBuildings, renderCourtyards } from './map/render.js';
 
 // ── Нормативные профили: загружаем из localStorage при старте ──
 getRegModel().loadProfiles();
+// ── Параметры застройки: загружаем из localStorage ──
+loadBuildingParams();
 
 // ── Индикатор dirty + автосейв на каждое изменение ──
 initDirtyIndicator();
@@ -70,6 +77,19 @@ on('exportPdfBtn', 'click', exportPDF);
 initPresets();
 initLayersPanel();
 initLicensePanel();
+initBuildingPanel();
+
+// ── Регенерация застройки по событию ──
+onEvent('buildings:regenerate', () => {
+  if (!state.blocks.length) return;
+  regenerateAllPlots();
+  generateAllBuildings();
+  renderCourtyards();
+  renderPlots();
+  renderBuildings();
+  updateStats();
+  markDirty();
+});
 
 // ── main просит сохранить перед закрытием ──
 if (window.terrimind && window.terrimind.onRequestSaveBeforeClose) {

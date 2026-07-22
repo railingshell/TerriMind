@@ -7,7 +7,27 @@ import { emit } from '../core/events.js';
 import { centerOf } from '../geometry/turfSafe.js';
 import { zoneOf, zoneStyle, nextZone, ROAD_STYLES, INNER_STYLES } from '../zones/zoneConfig.js';
 
-const { blocksLayer, roadsLayer, innerLayer, labelsLayer } = mapCtx;
+const { blocksLayer, roadsLayer, innerLayer, labelsLayer,
+        plotsLayer, buildingsLayer, courtyardsLayer } = mapCtx;
+
+// ── Стили участков по plotType ──
+const PLOT_STYLES = {
+  residential: { color: '#c0692a', weight: 1, fillColor: '#f5cba7', fillOpacity: 0.55 },
+  commercial:  { color: '#1a5276', weight: 1, fillColor: '#aed6f1', fillOpacity: 0.55 },
+  social:      { color: '#1e8449', weight: 1, fillColor: '#a9dfbf', fillOpacity: 0.55 },
+  parking:     { color: '#7d6608', weight: 1, fillColor: '#f9e79f', fillOpacity: 0.55 },
+  green:       { color: '#1d6832', weight: 1, fillColor: '#a9dfbf', fillOpacity: 0.55 }
+};
+const PLOT_HOVER = { weight: 2.5, fillOpacity: 0.75 };
+
+// ── Стили зданий по морфотипу ──
+const BUILDING_STYLES = {
+  perimeter:    { color: '#8e5a2a', weight: 1, fillColor: '#E8C4A0', fillOpacity: 0.85 },
+  section:      { color: '#2c5f8a', weight: 1, fillColor: '#C4D4E8', fillOpacity: 0.85 },
+  tower:        { color: '#5b3a8a', weight: 1, fillColor: '#D4C4E8', fillOpacity: 0.85 },
+  freestanding: { color: '#27652e', weight: 1, fillColor: '#C4E8D4', fillOpacity: 0.85 },
+  courtyard:    { color: '#6b4c1a', weight: 1, fillColor: '#E8D4A0', fillOpacity: 0.85 }
+};
 
 let selectedIndex = null;
 
@@ -99,6 +119,81 @@ export function renderInner() {
   }
 }
 
+/** Отрисовка земельных участков (plots). */
+export function renderPlots() {
+  plotsLayer.clearLayers();
+  if (!state.showPlots) return;
+  const allPlots = Object.values(state.plots).flat();
+  for (const plot of allPlots) {
+    const ptype = (plot.properties && plot.properties.plotType) || 'residential';
+    const style = PLOT_STYLES[ptype] || PLOT_STYLES.residential;
+    const layer = L.geoJSON(plot, { pane: 'plotsPane', style });
+
+    layer.on('mouseover', () => layer.setStyle(Object.assign({}, style, PLOT_HOVER)));
+    layer.on('mouseout',  () => layer.setStyle(style));
+    layer.on('click', (e) => {
+      if (e.originalEvent) L.DomEvent.stop(e);
+      const p = plot.properties;
+      if (!p) return;
+      L.popup({ className: 'tm-popup' })
+        .setLatLng(e.latlng)
+        .setContent(
+          `<b>Участок ${p.id}</b><br>
+           Тип: ${p.plotType}<br>
+           Площадь: ${(p.area || 0).toLocaleString('ru-RU')} м²<br>
+           Ширина фронта: ${p.frontageWidth || '—'} м<br>
+           Глубина: ${p.depth || '—'} м<br>
+           Застраиваемая: ${(p.buildableArea || 0).toLocaleString('ru-RU')} м²<br>
+           Макс. этажей: ${p.maxFloors || '—'}`
+        ).openOn(mapCtx.map);
+    });
+    layer.addTo(plotsLayer);
+  }
+}
+
+/** Отрисовка дворов. */
+export function renderCourtyards() {
+  courtyardsLayer.clearLayers();
+  for (const courtyard of Object.values(state.courtyards)) {
+    if (!courtyard) continue;
+    L.geoJSON(courtyard, {
+      pane: 'courtyardsPane',
+      style: { color: '#1d6832', weight: 0.8, fillColor: '#27ae60', fillOpacity: 0.22 }
+    }).addTo(courtyardsLayer);
+  }
+}
+
+/** Отрисовка зданий. */
+export function renderBuildings() {
+  buildingsLayer.clearLayers();
+  if (!state.showBuildings) return;
+  for (const bld of Object.values(state.buildings)) {
+    if (!bld) continue;
+    const morph = (bld.properties && bld.properties.morphotype) || 'freestanding';
+    const style = BUILDING_STYLES[morph] || BUILDING_STYLES.freestanding;
+    const layer = L.geoJSON(bld, { pane: 'buildingsPane', style });
+
+    layer.on('click', (e) => {
+      if (e.originalEvent) L.DomEvent.stop(e);
+      const p = bld.properties;
+      if (!p) return;
+      L.popup({ className: 'tm-popup' })
+        .setLatLng(e.latlng)
+        .setContent(
+          `<b>Здание</b><br>
+           Морфотип: ${p.morphotype}<br>
+           Этажей: ${p.floors}<br>
+           Пятно: ${(p.footprintArea || 0).toLocaleString('ru-RU')} м²<br>
+           Общая площадь: ${(p.totalFloorArea || 0).toLocaleString('ru-RU')} м²<br>
+           Жилая: ${(p.residentialArea || 0).toLocaleString('ru-RU')} м²<br>
+           Коммерческая: ${(p.commercialArea || 0).toLocaleString('ru-RU')} м²<br>
+           Высота: ${p.height || '—'} м`
+        ).openOn(mapCtx.map);
+    });
+    layer.addTo(buildingsLayer);
+  }
+}
+
 // Полная перерисовка сгенерированной геометрии.
 // Намеренно НЕ эмитит stats:update — вызывающий код (drawTools, loader)
 // сам вызывает updateStats() после renderAll(), что исключает двойной пересчёт.
@@ -107,6 +202,9 @@ export function renderAll() {
   redrawBlocks();
   renderInner();
   renderLabels();
+  renderCourtyards();
+  renderPlots();
+  renderBuildings();
 }
 
 export function clearRenderLayers() {
@@ -114,5 +212,8 @@ export function clearRenderLayers() {
   roadsLayer.clearLayers();
   labelsLayer.clearLayers();
   innerLayer.clearLayers();
+  plotsLayer.clearLayers();
+  buildingsLayer.clearLayers();
+  courtyardsLayer.clearLayers();
   selectedIndex = null;
 }

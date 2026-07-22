@@ -11,8 +11,9 @@ import { barChart, donutChart, legend, color } from '../charts.js';
 import { ZONES } from '../../../zones/zoneConfig.js';
 
 const CATEGORY_LABEL = {
-  [METRIC_CATEGORY.TERRITORY]: 'Территория',
-  [METRIC_CATEGORY.BUILDING]: 'Застройка',
+  [METRIC_CATEGORY.TERRITORY]:   'Территория',
+  [METRIC_CATEGORY.BUILDING]:    'Застройка',
+  [METRIC_CATEGORY.APARTMENTS]:  'Квартирография',
   [METRIC_CATEGORY.POPULATION]: 'Население и обеспеченность',
   [METRIC_CATEGORY.COEFFICIENT]: 'Коэффициенты',
   [METRIC_CATEGORY.BALANCE]: 'Баланс территории'
@@ -99,6 +100,10 @@ export function renderResults(metrics) {
     html.push('<div class="rp-chart-row">' + donutChart(d, { size: 110 }) + legend(d) + '</div></div>');
   }
 
+  // ── Квартирография (Промпт 1.4) ──
+  const aptSection = renderApartmentSection(byId, metrics.metrics);
+  if (aptSection) html.push(aptSection);
+
   // ── Полные показатели по категориям ──
   const order = [METRIC_CATEGORY.TERRITORY, METRIC_CATEGORY.BUILDING, METRIC_CATEGORY.POPULATION, METRIC_CATEGORY.BALANCE];
   for (const cat of order) {
@@ -114,6 +119,66 @@ export function renderResults(metrics) {
 
   html.push('<div class="rp-updated">Обновлено: ' + new Date().toLocaleTimeString('ru-RU') + '</div>');
   host.innerHTML = html.join('');
+}
+
+/** Секция квартирографии с таблицей и donut-диаграммой. */
+function renderApartmentSection(byId, allMetrics) {
+  const total = byId.apartments_total;
+  if (!total || !total.raw) return null;
+
+  const types = [
+    { id: 'apartments_studio', label: 'Студия' },
+    { id: 'apartments_1k',     label: '1-комн.' },
+    { id: 'apartments_2k',     label: '2-комн.' },
+    { id: 'apartments_3k',     label: '3-комн.' }
+  ];
+
+  const totalCount = (total.raw || 0);
+  const rows = types.map((t, i) => {
+    const m = byId[t.id];
+    if (!m || m.raw === null) return '';
+    const share = totalCount > 0 ? Math.round(m.raw / totalCount * 100) : 0;
+    return `<tr>
+      <td>${esc(t.label)}</td>
+      <td class="rp-v">${m.raw.toLocaleString('ru-RU')}</td>
+      <td class="rp-v">${share}%</td>
+    </tr>`;
+  }).join('');
+
+  // Donut данные
+  const chartData = types.map((t, i) => {
+    const m = byId[t.id];
+    return { label: t.label, value: (m && m.raw) || 0, color: color(i) };
+  }).filter(d => d.value > 0);
+
+  // Норматив sqm_per_person
+  const sqm = byId.sqm_per_person_apts;
+  let normRow = '';
+  if (sqm && sqm.raw !== null) {
+    const val = sqm.rounded;
+    const cls = val < 18 ? 'rp-bad' : val > 40 ? 'rp-warn' : 'rp-ok';
+    const msg = val < 18 ? '⚠️ Ниже нормы 18 м²/чел' : val > 40 ? '📊 Высокая обеспеченность' : '✓ В норме';
+    normRow = `<div class="rp-viol rp-${cls}" style="margin-top:var(--sp-2)">${msg} — ${val} м²/чел</div>`;
+  }
+
+  const avgM = byId.avg_apartment_area;
+  const avgStr = (avgM && avgM.raw !== null) ? `Средняя площадь: <b>${avgM.rounded} м²</b>` : '';
+
+  return `<div class="rp-section">
+    <div class="rp-h">Квартирография</div>
+    <div class="rp-chart-row">
+      ${donutChart(chartData, { size: 100 })}
+      <div style="flex:1">
+        <table class="rp-table">
+          <tr><th>Тип</th><th class="rp-v">Кол-во</th><th class="rp-v">Доля</th></tr>
+          ${rows}
+          <tr style="font-weight:700"><td>Всего</td><td class="rp-v">${totalCount.toLocaleString('ru-RU')}</td><td class="rp-v">100%</td></tr>
+        </table>
+        <div class="rp-expl" style="margin-top:var(--sp-2)">${avgStr}</div>
+        ${normRow}
+      </div>
+    </div>
+  </div>`;
 }
 
 function coefficientCard(m, comp) {

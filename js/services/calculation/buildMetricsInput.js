@@ -91,7 +91,21 @@ export function buildMetricsInput(proj) {
     regulationExcludedM2: nonNegative(p.regulationExcludedM2) || 0,
     conflictAreaM2: nonNegative(p.conflictAreaM2) || 0,
     zoneAreaM2,
-    buildings,
+    // Если есть реальные здания — используем их вместо синтетических
+    buildings: (p.realBuildings && p.realBuildings.length > 0)
+      ? p.realBuildings.map(rb => ({
+          footprintM2:     rb.footprintArea   || 0,
+          floorAreaM2:     rb.totalFloorArea  || 0,
+          residentialArea: rb.residentialArea || 0,
+          undergroundM2:   0,
+          residentialShare: rb.totalFloorArea > 0
+            ? (rb.residentialArea || 0) / rb.totalFloorArea
+            : 0,
+          floorsAbove:     rb.floors          || 1,
+          sections:        1,
+          zone:            'residential'
+        }))
+      : buildings,
     params: p.params || {},
     fart: p.fart || {}
   };
