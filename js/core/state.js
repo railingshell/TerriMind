@@ -40,10 +40,15 @@ export function resetAll() {
   resetGenerated();
 }
 
-// Пометка изменений с событием
+// Пометка изменений с событием.
+// 'dirty:change' — только при реальном переходе clean→dirty или dirty→clean (для UI/IPC).
+// 'project:change' — при каждом изменении (для дебаунса автосейва).
 export function markDirty() {
-  if (!state.dirty) { state.dirty = true; emit('dirty:change', true); }
-  else emit('dirty:change', true);
+  emit('project:change');
+  if (!state.dirty) {
+    state.dirty = true;
+    emit('dirty:change', true);
+  }
 }
 export function markSaved() {
   state.dirty = false;

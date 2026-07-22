@@ -185,6 +185,7 @@ map.on(L.Draw.Event.CREATED, (e) => {
   drawnItems.addLayer(state.parcel);
   attachParcelEditing();
   updateParcelArea();
+  updateStats();   // сброс ТЭП-панели после очистки предыдущего проекта
   syncButtons();
   markDirty();
   emit('parcel:created');
@@ -195,6 +196,7 @@ map.on(L.Draw.Event.EDITED, () => {
   resetGenerated();
   clearRenderLayers();
   updateParcelArea();
+  updateStats();   // сброс ТЭП: кварталы сброшены, показатели должны обнулиться
   syncButtons();
   markDirty();
 });

@@ -21,7 +21,9 @@ import { initLicensePanel } from './ui/licensePanel.js';
 
 // ── Индикатор dirty + автосейв на каждое изменение ──
 initDirtyIndicator();
-onEvent('dirty:change', (d) => { if (d) scheduleAutosave(); });
+// 'project:change' — каждое изменение → дебаунс автосейва
+// 'dirty:change'   — только переход состояния → UI/IPC (в dirtyIndicator)
+onEvent('project:change', scheduleAutosave);
 onEvent('stats:update', () => updateStats());
 
 // ── Инструменты рисования/генерации ──
