@@ -16,6 +16,7 @@
   "build": {
     "appId": "com.rogaart.terrimind",
     "productName": "TerriMind",
+    "icon": "build/icon.png",
     "files": [
       "main.js",
       "preload.js",
@@ -25,6 +26,7 @@
       "activation-store.js",
       "activation.html",
       "activation-ui.js",
+      "tokens.json",
       "node_modules/leaflet/**/*",
       "node_modules/leaflet-draw/**/*",
       "node_modules/@turf/**/*",
