@@ -5,9 +5,10 @@ import { state } from '../core/state.js';
 import { emit } from '../core/events.js';
 import { safeIntersect, safeArea, safeBuffer, unionAll, safeIntersects } from '../geometry/turfSafe.js';
 import { notifyError, notifyOk } from '../core/toast.js';
-import { mapCtx } from '../map/mapCore.js';
 
-const { zouitLayer } = mapCtx;
+// mapCtx передаётся через initZouit() из app.js — избегаем импорта map-слоя из domain
+let _mc = null;
+export function initZouit(mapCtx) { _mc = mapCtx; }
 
 // ── Справочник типов ЗОУИТ ────────────────────────────────────────────────
 export const ZOUIT_TYPES = Object.freeze([
@@ -205,7 +206,7 @@ const _zouitLayers  = new Map();    // id → L.Layer (zona)
 const _bldHighlight = new Map();    // buildingId → L.Layer (подсветка)
 
 export function renderZouit() {
-  zouitLayer.clearLayers();
+  _mc && _mc.zouitLayer.clearLayers();
   _zouitLayers.clear();
   for (const z of state.zouitLayers) _addZouitToMap(z);
 }
@@ -231,20 +232,20 @@ function _addZouitToMap(z) {
     (z.note ? `<br>${esc(z.note)}` : ''),
     { sticky: true }
   );
-  zouitLayer.addLayer(layer);
+  _mc && _mc.zouitLayer.addLayer(layer);
   _zouitLayers.set(z.id, layer);
 }
 
 function _removeZouitFromMap(id) {
   const layer = _zouitLayers.get(id);
-  if (layer) { zouitLayer.removeLayer(layer); _zouitLayers.delete(id); }
+  if (layer) { _mc && _mc.zouitLayer.removeLayer(layer); _zouitLayers.delete(id); }
 }
 
 /** Подсветить конфликтующие здания красным контуром. */
 function _highlightConflictingBuildings(conflicts) {
   // Убрать старые подсветки
   for (const layer of _bldHighlight.values()) {
-    try { mapCtx.buildingsLayer.removeLayer(layer); } catch (e) {}
+    try { _mc && _mc.buildingsLayer.removeLayer(layer); } catch (e) {}
   }
   _bldHighlight.clear();
 
@@ -257,7 +258,7 @@ function _highlightConflictingBuildings(conflicts) {
       style: () => ({ color: '#e74c3c', weight: 3, fillOpacity: 0, dashArray: '4 2' }),
       pane: 'zouitPane'
     });
-    mapCtx.buildingsLayer.addLayer(hl);
+    _mc && _mc.buildingsLayer.addLayer(hl);
     _bldHighlight.set(id, hl);
   }
 }
@@ -269,7 +270,7 @@ export function focusConflict(conflict) {
   if (bld && bld.geometry) {
     try {
       const b = L.geoJSON(bld).getBounds();
-      if (b.isValid()) mapCtx.map.flyToBounds(b, { padding: [60, 60], duration: 0.6 });
+      if (b.isValid()) _mc && _mc.map.flyToBounds(b, { padding: [60, 60], duration: 0.6 });
     } catch (e) {}
     return;
   }
@@ -280,7 +281,7 @@ export function focusConflict(conflict) {
     if (poly) {
       try {
         const b = L.geoJSON(poly).getBounds();
-        if (b.isValid()) mapCtx.map.flyToBounds(b, { padding: [60, 60], duration: 0.6 });
+        if (b.isValid()) _mc && _mc.map.flyToBounds(b, { padding: [60, 60], duration: 0.6 });
       } catch (e) {}
     }
   }

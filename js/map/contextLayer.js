@@ -159,25 +159,28 @@ function _getDrawHandler(geomType) {
   return new L.Draw.Polygon(map, { ...opts, showArea: false });
 }
 
-// Слушаем событие L.Draw.Event.CREATED для контекстных объектов
-map.on(L.Draw.Event.CREATED, (e) => {
-  if (!_pendingDrawType) return;
-  const type = _pendingDrawType;
-  _pendingDrawType = '';
+// Регистрируем обработчик L.Draw.Event.CREATED для контекстных объектов.
+// Вызывается ЯВНО из app.js после инициализации всех модулей.
+export function initContextLayer() {
+  map.on(L.Draw.Event.CREATED, (e) => {
+    if (!_pendingDrawType) return;
+    const type = _pendingDrawType;
+    _pendingDrawType = '';
 
-  let geometry;
-  try { geometry = e.layer.toGeoJSON().geometry; } catch (err) { return; }
+    let geometry;
+    try { geometry = e.layer.toGeoJSON().geometry; } catch (err) { return; }
 
-  const typeDef = getContextType(type);
-  addContextObject({
-    contextType: type,
-    label:       typeDef.label,
-    status:      'existing',
-    geometry,
-    includeInBalance: true,
-    note: ''
+    const typeDef = getContextType(type);
+    addContextObject({
+      contextType: type,
+      label:       typeDef.label,
+      status:      'existing',
+      geometry,
+      includeInBalance: true,
+      note: ''
+    });
   });
-});
+}
 
 // ── Карта: внутренние функции ─────────────────────────────────────────────
 const _leafletLayers = new Map(); // id → L.Layer

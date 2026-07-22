@@ -27,13 +27,16 @@ import { regenerateAllPlots } from './geometry/plotGenerator.js';
 import { generateAllBuildings } from './geometry/buildingGenerator.js';
 import { renderPlots, renderBuildings, renderCourtyards } from './map/render.js';
 import { recalcSocialBalance, setPopulation } from './domain/infrastructure/socialInfra.js';
-import { renderContextLayer, addContextObject, importContextFromGeoJSON, startDrawingContext, CONTEXT_TYPES } from './map/contextLayer.js';
-import { renderZouit, computeZouitConflicts, addZouit, importZouitFromGeoJSON } from './domain/zouit.js';
+import { renderContextLayer, addContextObject, importContextFromGeoJSON, startDrawingContext, initContextLayer, CONTEXT_TYPES } from './map/contextLayer.js';
+import { renderZouit, computeZouitConflicts, addZouit, importZouitFromGeoJSON, initZouit } from './domain/zouit.js';
 
 // ── Нормативные профили: загружаем из localStorage при старте ──
 getRegModel().loadProfiles();
 // ── Параметры застройки: загружаем из localStorage ──
 loadBuildingParams();
+// ── Инициализируем модули требующие mapCtx (после импортов) ──
+initZouit(mapCtx);
+initContextLayer();
 
 // ── Индикатор dirty + автосейв на каждое изменение ──
 initDirtyIndicator();
