@@ -10,6 +10,17 @@
 import { makeMetric, METRIC_CATEGORY, VALIDITY, COMPLIANCE } from './metricSchema.js';
 import { safeDivide, m2ToHa, nonNegative } from '../units.js';
 
+// Русские названия зон (дублируем здесь чтобы не тащить UI-зависимость в domain)
+const ZONE_LABELS = {
+  residential: 'Жилая',
+  public:      'Общественная',
+  commercial:  'Коммерческая',
+  industrial:  'Промышленная',
+  recreation:  'Рекреационная',
+  mixed:       'Смешанная',
+  special:     'Специальная'
+};
+
 /**
  * @typedef {object} MetricsInput
  * @property {number} parcelAreaM2            площадь исходного участка
@@ -165,14 +176,15 @@ export function computeMetrics(input) {
   const zoneAreaM2 = inp.zoneAreaM2 || {};
   const zoneTotal = Object.values(zoneAreaM2).reduce((s, v) => s + (nonNegative(v) || 0), 0);
   for (const [zone, area] of Object.entries(zoneAreaM2)) {
+    const zoneName = ZONE_LABELS[zone] || zone;
     add(makeMetric({
-      id: 'zone_area_' + zone, label: 'Зона: ' + zone, category: METRIC_CATEGORY.TERRITORY,
+      id: 'zone_area_' + zone, label: 'Зона: ' + zoneName, category: METRIC_CATEGORY.TERRITORY,
       unit: 'м²', raw: nonNegative(area) || 0, dependencies: ['zones'],
-      explanation: 'Суммарная площадь кварталов функциональной зоны «' + zone + '».'
+      explanation: 'Суммарная площадь кварталов функциональной зоны «' + zoneName + '».'
     }));
     const share = safeDivide((nonNegative(area) || 0) * 100, zoneTotal);
     add(makeMetric({
-      id: 'zone_share_' + zone, label: 'Доля зоны: ' + zone, category: METRIC_CATEGORY.BALANCE,
+      id: 'zone_share_' + zone, label: 'Доля зоны: ' + zoneName, category: METRIC_CATEGORY.BALANCE,
       unit: '%', raw: share, digits: 1, dependencies: ['zones'],
       formula: 'zoneArea / Σzones · 100', numerator: area, denominator: zoneTotal,
       validity: share === null ? VALIDITY.DIVISION_BY_ZERO : VALIDITY.VALID

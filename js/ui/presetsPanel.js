@@ -1,8 +1,9 @@
 // ui/presetsPanel.js — UI пресетов (список, сохранение, удаление, применение).
 
 import { $, on } from '../core/dom.js';
-import { markDirty } from '../core/state.js';
+import { state, markDirty } from '../core/state.js';
 import { BUILTIN_PRESETS, getUserPresets, saveUserPresets, getPresets, collectParams, applyParams } from '../project/params.js';
+import { updateStats } from '../project/stats.js';
 
 export function renderPresetOptions(selectKey) {
   const sel = $('preset');
@@ -40,10 +41,12 @@ function applyPreset(key) {
   const preset = getPresets()[key];
   if (!preset) return;
   applyParams(Object.assign({}, collectParams(), preset.params));
+  // Пересчитываем ТЭП если есть кварталы (параметры изменились — результат устарел)
+  if (state.blocks.length) updateStats();
   markDirty();
   updateButtons();
   const hint = $('presetHint');
-  if (hint) hint.textContent = 'Пресет «' + preset.label + '» применён. Нажмите «Сгенерировать кварталы».';
+  if (hint) hint.textContent = 'Пресет «' + preset.label + '» применён.' + (state.blocks.length ? '' : ' Нажмите «Сгенерировать кварталы».');
 }
 
 export function initPresets() {

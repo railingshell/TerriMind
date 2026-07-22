@@ -8,6 +8,7 @@ import { METRIC_CATEGORY } from '../../../domain/metrics/metricSchema.js';
 import { checkCompliance } from '../../../domain/regulations/ruleSchema.js';
 import { getRegModel } from '../regulations/regModel.js';
 import { barChart, donutChart, legend, color } from '../charts.js';
+import { ZONES } from '../../../zones/zoneConfig.js';
 
 const CATEGORY_LABEL = {
   [METRIC_CATEGORY.TERRITORY]: 'Территория',
@@ -160,7 +161,9 @@ function zoneShares(byId) {
   for (const [id, m] of Object.entries(byId)) {
     if (!id.startsWith('zone_area_')) continue;
     if (!m.raw) continue;
-    out.push({ label: id.replace('zone_area_', ''), value: m.raw, color: color(i++) });
+    const zoneKey = id.replace('zone_area_', '');
+    const label = (ZONES[zoneKey] && ZONES[zoneKey].label) || zoneKey;
+    out.push({ label, value: m.raw, color: color(i++) });
   }
   return out;
 }

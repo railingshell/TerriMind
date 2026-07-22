@@ -6,7 +6,6 @@
 import { mapCtx } from '../map/mapCore.js';
 import { state } from '../core/state.js';
 import { renderLabels } from '../map/render.js';
-import { markDirty } from '../core/state.js';
 import { $ } from '../core/dom.js';
 import { ZONES } from '../zones/zoneConfig.js';
 
@@ -140,7 +139,7 @@ function buildRow(cfg) {
     setVisible(cfg.id, v);
     eye.classList.toggle('off', !v);
     row.classList.toggle('hidden-layer', !v);
-    markDirty();
+    // Видимость слоя — UI-предпочтение, не данные проекта. markDirty не нужен.
   });
   lock.addEventListener('click', () => {
     const v = !layerState[cfg.id].locked;
