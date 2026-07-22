@@ -34,8 +34,14 @@ import { renderZouit, computeZouitConflicts, addZouit, importZouitFromGeoJSON, i
 const _diag = (step) => console.log(`%c[TerriMind app.js] ${step}`, 'color:#3498db');
 const _diagErr = (step, err) => console.error(`[TerriMind app.js] FAIL: ${step}`, err);
 
+// Сигнал что app.js запустился (перехватывается inline-скриптом в index.html)
+if (typeof window !== 'undefined') {
+  window._appStarted = true;
+  if (window._diagLog) window._diagLog('app.js ЗАПУСТИЛСЯ', true);
+}
 _diag('imports loaded, mapCtx=' + (mapCtx ? 'OK' : 'UNDEFINED'));
 _diag('mapCtx.map=' + (mapCtx && mapCtx.map ? 'OK' : 'UNDEFINED'));
+// ─────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────
 
 // ── Нормативные профили: загружаем из localStorage при старте ──
