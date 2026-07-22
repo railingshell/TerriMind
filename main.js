@@ -99,12 +99,21 @@ async function handleCloseRequest(win) {
 }
 
 // Запросить у renderer сохранение проекта; вернуть true при успехе (Этап 3)
+// Таймаут 8 сек: если renderer завис или не отвечает — считаем сохранение неудавшимся
+// и НЕ закрываем окно (данные не потеряются).
 function requestRendererSave(win) {
   return new Promise((resolve) => {
-    // одноразовый ответ от renderer
-    ipcMain.once('close-save-result', (event, ok) => {
+    let settled = false;
+    const done = (ok) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      ipcMain.removeListener('close-save-result', listener);
       resolve(!!ok);
-    });
+    };
+    const listener = (event, ok) => done(ok);
+    const timer = setTimeout(() => done(false), 8000);
+    ipcMain.once('close-save-result', listener);
     win.webContents.send('request-save-before-close');
   });
 }

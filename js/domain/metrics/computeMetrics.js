@@ -10,6 +10,17 @@
 import { makeMetric, METRIC_CATEGORY, VALIDITY, COMPLIANCE } from './metricSchema.js';
 import { safeDivide, m2ToHa, nonNegative } from '../units.js';
 
+// Русские названия зон (дублируем здесь чтобы не тащить UI-зависимость в domain)
+const ZONE_LABELS = {
+  residential: 'Жилая',
+  public:      'Общественная',
+  commercial:  'Коммерческая',
+  industrial:  'Промышленная',
+  recreation:  'Рекреационная',
+  mixed:       'Смешанная',
+  special:     'Специальная'
+};
+
 /**
  * @typedef {object} MetricsInput
  * @property {number} parcelAreaM2            площадь исходного участка
@@ -165,14 +176,15 @@ export function computeMetrics(input) {
   const zoneAreaM2 = inp.zoneAreaM2 || {};
   const zoneTotal = Object.values(zoneAreaM2).reduce((s, v) => s + (nonNegative(v) || 0), 0);
   for (const [zone, area] of Object.entries(zoneAreaM2)) {
+    const zoneName = ZONE_LABELS[zone] || zone;
     add(makeMetric({
-      id: 'zone_area_' + zone, label: 'Зона: ' + zone, category: METRIC_CATEGORY.TERRITORY,
+      id: 'zone_area_' + zone, label: 'Зона: ' + zoneName, category: METRIC_CATEGORY.TERRITORY,
       unit: 'м²', raw: nonNegative(area) || 0, dependencies: ['zones'],
-      explanation: 'Суммарная площадь кварталов функциональной зоны «' + zone + '».'
+      explanation: 'Суммарная площадь кварталов функциональной зоны «' + zoneName + '».'
     }));
     const share = safeDivide((nonNegative(area) || 0) * 100, zoneTotal);
     add(makeMetric({
-      id: 'zone_share_' + zone, label: 'Доля зоны: ' + zone, category: METRIC_CATEGORY.BALANCE,
+      id: 'zone_share_' + zone, label: 'Доля зоны: ' + zoneName, category: METRIC_CATEGORY.BALANCE,
       unit: '%', raw: share, digits: 1, dependencies: ['zones'],
       formula: 'zoneArea / Σzones · 100', numerator: area, denominator: zoneTotal,
       validity: share === null ? VALIDITY.DIVISION_BY_ZERO : VALIDITY.VALID
@@ -302,7 +314,115 @@ export function computeMetrics(input) {
     dependencies: ['blocks_area_m2', 'roads_total_m2', 'greenery_area_m2']
   }));
 
+  // ── Квартирография (Промпт 1.4) ──────────────────────────────────────────
+  const aptMetrics = computeApartmentMix(bAgg.livingM2, inp.params);
+  for (const m of aptMetrics) add(m);
+
   const byId = {};
   for (const m of metrics) byId[m.id] = m;
   return { metrics, byId };
+}
+
+// ── Расчёт квартирографии ─────────────────────────────────────────────────
+const DEFAULT_APT_MIX = Object.freeze({
+  studio:   { share: 0.10, avgArea: 28 },
+  oneRoom:  { share: 0.35, avgArea: 42 },
+  twoRoom:  { share: 0.40, avgArea: 65 },
+  threeRoom:{ share: 0.15, avgArea: 90 }
+});
+
+const APT_LABELS = {
+  studio:    'Студии',
+  oneRoom:   '1-комн.',
+  twoRoom:   '2-комн.',
+  threeRoom: '3-комн.'
+};
+
+/**
+ * Рассчитывает квартирографию.
+ * @param {number} totalResidentialM2  — жилая площадь, м²
+ * @param {object} params              — { apartmentMix, householdSize }
+ * @returns {Metric[]}
+ */
+export function computeApartmentMix(totalResidentialM2, params = {}) {
+  const mix   = (params && params.apartmentMix) || DEFAULT_APT_MIX;
+  const hsz   = (params && params.householdSize > 0) ? params.householdSize : 2.5;
+  const resM2 = nonNegative(totalResidentialM2) || 0;
+  const metrics = [];
+  const addA = (m) => { metrics.push(m); return m; };
+
+  if (resM2 === 0) {
+    // Нет жилой площади — возвращаем нулевые метрики
+    addA(makeMetric({ id: 'apartments_total', label: 'Квартир всего', category: METRIC_CATEGORY.APARTMENTS, unit: 'шт', raw: 0 }));
+    return metrics;
+  }
+
+  const types = ['studio', 'oneRoom', 'twoRoom', 'threeRoom'];
+  let totalCount = 0;
+  const counts = {};
+  const areas  = {};
+
+  for (const t of types) {
+    const spec   = mix[t] || DEFAULT_APT_MIX[t];
+    const share  = nonNegative(spec.share) ?? 0;
+    const avgA   = nonNegative(spec.avgArea) || 1;
+    const cnt    = Math.round(resM2 * share / avgA);
+    counts[t]    = cnt;
+    areas[t]     = cnt * avgA;
+    totalCount  += cnt;
+  }
+
+  // Индивидуальные квартиры
+  const idMap = { studio: 'apartments_studio', oneRoom: 'apartments_1k', twoRoom: 'apartments_2k', threeRoom: 'apartments_3k' };
+  const unitMap = { studio: 'Студии', oneRoom: '1К', twoRoom: '2К', threeRoom: '3К' };
+
+  for (const t of types) {
+    const spec = mix[t] || DEFAULT_APT_MIX[t];
+    addA(makeMetric({
+      id: idMap[t],
+      label: APT_LABELS[t],
+      category: METRIC_CATEGORY.APARTMENTS,
+      unit: 'шт',
+      raw: counts[t],
+      formula: `жилая площадь × ${Math.round(spec.share * 100)}% ÷ ${spec.avgArea} м²`,
+      numerator: resM2 * (spec.share || 0),
+      denominator: spec.avgArea || 1,
+      explanation: `${APT_LABELS[t]}: доля ${Math.round((spec.share || 0) * 100)}%, средняя площадь ${spec.avgArea} м²`
+    }));
+  }
+
+  addA(makeMetric({ id: 'apartments_total', label: 'Квартир всего', category: METRIC_CATEGORY.APARTMENTS, unit: 'шт', raw: totalCount }));
+
+  const avgAptArea = totalCount > 0 ? safeDivide(resM2, totalCount) : null;
+  addA(makeMetric({ id: 'avg_apartment_area', label: 'Средняя площадь квартиры', category: METRIC_CATEGORY.APARTMENTS, unit: 'м²', digits: 1, raw: avgAptArea }));
+
+  // Население через квартирографию
+  const popFromApts = totalCount > 0 ? totalCount * hsz : null;
+  addA(makeMetric({ id: 'population_from_apts', label: 'Население (по квартирам)', category: METRIC_CATEGORY.APARTMENTS, unit: 'чел.', raw: popFromApts, formula: 'квартир × размер домохозяйства', numerator: totalCount, denominator: null }));
+
+  // Обеспеченность и нормативная проверка
+  const sqmPerPerson = (popFromApts && popFromApts > 0) ? safeDivide(resM2, popFromApts) : null;
+  let aptValidity = VALIDITY.VALID;
+  let aptExplanation = '';
+  if (sqmPerPerson !== null) {
+    if (sqmPerPerson < 18) {
+      aptValidity   = VALIDITY.VALID; // validity остаётся valid, нарушение через compliance
+      aptExplanation = '⚠️ Ниже нормы 18 м²/чел — обеспеченность жильём недостаточна';
+    } else if (sqmPerPerson > 40) {
+      aptExplanation = '📊 Высокая обеспеченность жильём';
+    }
+  }
+  addA(makeMetric({
+    id: 'sqm_per_person_apts',
+    label: 'Обеспеченность жильём (кварт.)',
+    category: METRIC_CATEGORY.APARTMENTS,
+    unit: 'м²/чел.', digits: 1,
+    raw: sqmPerPerson,
+    formula: 'жилая площадь / население',
+    numerator: resM2, denominator: popFromApts,
+    validity: aptValidity,
+    explanation: aptExplanation || 'Обеспеченность жилой площадью на человека.'
+  }));
+
+  return metrics;
 }

@@ -82,6 +82,6 @@ export function groupedBars(labels, series, opts = {}) {
   return `<svg viewBox="0 0 ${w} ${h}" width="100%" class="tm-chart" role="img">${bars}${axis}</svg>`;
 }
 
-function clip(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n - 1) + '…' : escapeXml(s); }
+function clip(s, n) { s = String(s == null ? '' : s); return escapeXml(s.length > n ? s.slice(0, n - 1) + '…' : s); }
 function escapeXml(s) { return String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c])); }
 function fmtNum(n) { return Math.round(n).toLocaleString('ru-RU'); }

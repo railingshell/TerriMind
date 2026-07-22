@@ -6,7 +6,6 @@
 import { mapCtx } from '../map/mapCore.js';
 import { state } from '../core/state.js';
 import { renderLabels } from '../map/render.js';
-import { markDirty } from '../core/state.js';
 import { $ } from '../core/dom.js';
 import { ZONES } from '../zones/zoneConfig.js';
 
@@ -27,20 +26,24 @@ export function renderZonesLegend() {
   }
 }
 
-const { map, drawnItems, blocksLayer, roadsLayer, innerLayer, labelsLayer } = mapCtx;
+const { map, drawnItems, blocksLayer, roadsLayer, innerLayer, labelsLayer,
+        contextLayer: ctxLayer, zouitLayer } = mapCtx;
 
 // Реестр управляемых слоёв (группы + метаданные)
 const LAYERS = [
-  { id: 'parcel', name: 'Участок',      color: '#e67e22', group: 'base',     layer: drawnItems,  pane: null },
-  { id: 'blocks', name: 'Кварталы',     color: '#3498db', group: 'planning', layer: blocksLayer, pane: 'blocksPane' },
-  { id: 'roads',  name: 'Дороги',       color: '#3d4451', group: 'planning', layer: roadsLayer,  pane: 'roadsPane' },
-  { id: 'inner',  name: 'Дорожки',      color: '#cfcbc3', group: 'planning', layer: innerLayer,  pane: 'innerPane' },
-  { id: 'labels', name: 'Номера',       color: '#111827', group: 'planning', layer: labelsLayer, pane: 'labelsPane' }
+  { id: 'parcel',  name: 'Участок',              color: '#e67e22', group: 'base',    layer: drawnItems,  pane: null },
+  { id: 'blocks',  name: 'Кварталы',             color: '#3498db', group: 'plan',    layer: blocksLayer, pane: 'blocksPane' },
+  { id: 'roads',   name: 'Дороги',               color: '#3d4451', group: 'plan',    layer: roadsLayer,  pane: 'roadsPane' },
+  { id: 'inner',   name: 'Дорожки',              color: '#cfcbc3', group: 'plan',    layer: innerLayer,  pane: 'innerPane' },
+  { id: 'labels',  name: 'Номера',               color: '#111827', group: 'plan',    layer: labelsLayer, pane: 'labelsPane' },
+  { id: 'context', name: 'Контекст окружения',   color: '#607d8b', group: 'context', layer: ctxLayer,   pane: 'contextPane' },
+  { id: 'zouit',   name: 'ЗОУИТ',                color: '#e74c3c', group: 'context', layer: zouitLayer,  pane: 'zouitPane' }
 ];
 
 const GROUPS = {
-  base:     { name: 'Основа' },
-  planning: { name: 'Планировка' }
+  base:    { name: 'Основа' },
+  plan:    { name: 'Планировка' },
+  context: { name: 'Контекст' }
 };
 
 const layerState = {}; // id -> { visible, locked, opacity }
@@ -140,7 +143,7 @@ function buildRow(cfg) {
     setVisible(cfg.id, v);
     eye.classList.toggle('off', !v);
     row.classList.toggle('hidden-layer', !v);
-    markDirty();
+    // Видимость слоя — UI-предпочтение, не данные проекта. markDirty не нужен.
   });
   lock.addEventListener('click', () => {
     const v = !layerState[cfg.id].locked;

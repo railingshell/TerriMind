@@ -9,6 +9,9 @@ import { renderAll } from '../map/render.js';
 import { updateParcelArea, updateStats } from './stats.js';
 import { attachParcelEditing } from '../map/parcelEdit.js';
 import { notifyError } from '../core/toast.js';
+import { getRegModel } from '../renderer/features/regulations/regModel.js';
+import { setBuildingParams } from './params.js';
+import { state } from '../core/state.js';
 
 const { drawnItems } = mapCtx;
 
@@ -77,6 +80,19 @@ export function loadProject(project) {
     return false;
   }
   applyParams(project.params);
+  // Восстанавливаем нормативные настройки (если они были сохранены в файле)
+  if (project.regulation) {
+    try { getRegModel().deserialize(project.regulation); } catch (e) { /* старый формат — пропускаем */ }
+  }
+  if (project.buildingParams) {
+    try { setBuildingParams(project.buildingParams); } catch (e) { /* пропускаем */ }
+  }
+  // Социальная инфраструктура (Промпт 2.1–2.2)
+  if (Array.isArray(project.socialObjects))  state.socialObjects  = project.socialObjects.slice();
+  if (Array.isArray(project.contextObjects)) state.contextObjects = project.contextObjects.slice();
+  // Контекстный слой + ЗОУИТ
+  if (Array.isArray(project.contextLayer)) state.contextLayer = project.contextLayer.slice();
+  if (Array.isArray(project.zouitLayers))  state.zouitLayers  = project.zouitLayers.slice();
   if (project.geojson) loadGeoJSON(project.geojson);
   markSaved();
   return true;

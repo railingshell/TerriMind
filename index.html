@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!--
+    CSP: 'unsafe-eval' требуется из-за turf.min.js (RBush использует new Function для компиляции
+    компараторов). contextIsolation:true + nodeIntegration:false минимизируют риск.
+    TODO: убрать unsafe-eval после перехода на кастомную сборку Turf без RBush-eval
+    (см. README — раздел «Известные ограничения»).
+  -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://*.tile.openstreetmap.org; font-src 'self' data:;" />
   <title>TerriMind</title>
   <link rel="stylesheet" href="./node_modules/leaflet/dist/leaflet.css" />
@@ -314,8 +320,46 @@
     /* Совместимость: старый класс .accent -> компактный, без всю-ширину */
     .metric.accent .m-value { color: var(--accent); }
 
-    #zoneBreakdown { margin-top: var(--sp-3); }
-    #zoneBreakdown .row { font-size: var(--fs-md); margin: 6px 0; }
+    /* ── Панель подробных результатов ТЭП (resultsPanel) ── */
+    #resultsPanel { margin-top: var(--sp-3); }
+    .rp-section { margin-bottom: var(--sp-4); }
+    .rp-h { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-faint); font-weight: 600; margin-bottom: var(--sp-2); }
+    .rp-coef { background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r-md); padding: var(--sp-3); margin-bottom: var(--sp-2); }
+    .rp-coef-top { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: 4px; }
+    .rp-coef-label { flex: 1; font-size: var(--fs-md); color: var(--text-muted); }
+    .rp-coef-val { font-size: var(--fs-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .rp-badge { font-size: var(--fs-xs); font-weight: 600; padding: 2px 8px;
+      border-radius: var(--r-full); white-space: nowrap; }
+    .rp-badge.rp-ok { background: rgba(76,208,138,.18); color: var(--ok); }
+    .rp-badge.rp-warn { background: rgba(240,184,92,.18); color: var(--warn); }
+    .rp-badge.rp-bad { background: rgba(229,89,94,.18); color: var(--danger); }
+    .rp-badge.rp-muted { background: var(--surface); color: var(--text-faint); border: 1px solid var(--border); }
+    .rp-formula { font-size: var(--fs-xs); color: var(--text-faint); font-style: italic; margin-bottom: 4px; }
+    .rp-frac { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm);
+      color: var(--text-muted); font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+    .rp-div { color: var(--text-faint); font-size: var(--fs-lg); }
+    .rp-range { font-size: var(--fs-xs); color: var(--text-faint); margin-bottom: 4px; }
+    .rp-src { color: var(--accent); font-weight: 500; }
+    .rp-expl { font-size: var(--fs-xs); color: var(--text-faint); line-height: 1.4; }
+    .rp-violations { border: 1px solid var(--danger-soft); border-radius: var(--r-md);
+      padding: var(--sp-3); background: rgba(229,89,94,.05); }
+    .rp-viol { font-size: var(--fs-sm); color: var(--text); padding: 3px 0; line-height: 1.4; }
+    .rp-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+    .rp-table tr { border-bottom: 1px solid var(--border); }
+    .rp-table tr:last-child { border-bottom: none; }
+    .rp-table td { padding: 5px 4px; color: var(--text-muted); }
+    .rp-table td.rp-v { text-align: right; font-weight: 600; color: var(--text);
+      font-variant-numeric: tabular-nums; }
+    .rp-chart-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin: var(--sp-2) 0; }
+    .rp-updated { font-size: var(--fs-xs); color: var(--text-faint); margin-top: var(--sp-3); text-align: right; }
+    /* SVG-диаграммы */
+    .tm-chart { display: block; overflow: visible; }
+    .chart-empty { font-size: var(--fs-xs); color: var(--text-faint); padding: var(--sp-2) 0; }
+    .chart-legend { display: flex; flex-direction: column; gap: 5px; font-size: var(--fs-xs); flex: 1; min-width: 90px; }
+    .cl-item { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-muted); }
+    .cl-sw { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
     .hint {
       font-size: var(--fs-sm); color: var(--text-faint);
@@ -431,7 +475,41 @@
     body[data-tab="site"]    #sidebar .card[data-section="site"],
     body[data-tab="params"]  #sidebar .card[data-section="params"],
     body[data-tab="result"]  #sidebar .card[data-section="result"],
-    body[data-tab="project"] #sidebar .card[data-section="project"] { display: block; }
+    body[data-tab="project"]  #sidebar .card[data-section="project"],
+    body[data-tab="building"] #sidebar .card[data-section="building"],
+    body[data-tab="infra"]    #sidebar .card[data-section="infra"] { display: block; }
+
+    /* ── Панель социальной инфраструктуры ── */
+    .si-balance-table { width:100%; border-collapse:collapse; font-size:var(--fs-xs); }
+    .si-balance-table th { color:var(--text-faint); font-weight:600; text-transform:uppercase;
+      letter-spacing:.4px; padding:4px 4px 6px; text-align:right; }
+    .si-balance-table th:first-child { text-align:left; }
+    .si-balance-table td { padding:5px 4px; border-bottom:1px solid var(--border); }
+    .si-num { text-align:right; font-variant-numeric:tabular-nums; }
+    .si-unit { color:var(--text-faint); font-size:var(--fs-xs); }
+    .si-row-deficit  td { background:rgba(229,89,94,.08); }
+    .si-row-surplus  td { background:rgba(76,208,138,.08); }
+    .si-row-zero     td { color:var(--text-faint); }
+    .si-icon-deficit { color:var(--danger); }
+    .si-icon-surplus { color:var(--ok); }
+    .si-deficit { color:var(--danger); font-weight:700; }
+    .si-surplus { color:var(--ok);     font-weight:700; }
+    .si-icon { font-size:14px; }
+    .si-obj-row { display:flex; align-items:center; gap:var(--sp-2);
+      padding:5px 0; border-bottom:1px solid var(--border); font-size:var(--fs-sm); }
+    .si-obj-name { flex:1; color:var(--text); }
+    .si-obj-cap  { color:var(--text-muted); font-size:var(--fs-xs); }
+    .si-del-btn  { border:none; background:transparent; color:var(--text-faint);
+      cursor:pointer; padding:2px 6px; border-radius:var(--r-sm); font-size:13px;
+      transition:color var(--trans), background var(--trans); }
+    .si-del-btn:hover { color:var(--danger); background:var(--danger-soft); }
+    .si-map-marker { width:32px; height:32px; border-radius:50%; display:flex;
+      align-items:center; justify-content:center; font-size:16px;
+      box-shadow:0 2px 8px rgba(0,0,0,.35); border:2px solid rgba(255,255,255,.7); }
+
+    /* ── Контекстный слой + ЗОУИТ ── */
+    .ctx-import-row { display:flex; gap:var(--sp-2); flex-wrap:wrap; margin-top:var(--sp-2); }
+    .ctx-import-row .btn { flex:1; min-width:0; font-size:var(--fs-xs); padding:7px 6px; }
 
     /* Large rounded map (primary visual block) */
     #map {
@@ -603,6 +681,14 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         <span class="nav-tip">Проект</span>
       </button>
+      <button type="button" class="nav-btn" data-nav="building" title="Застройка">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="11" rx="1"/><path d="M9 21V10M15 21V10M3 14h18"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>
+        <span class="nav-tip">Застройка</span>
+      </button>
+      <button type="button" class="nav-btn" data-nav="infra" title="Инфраструктура">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12M12 12l-4-4M12 12l4-4M3 20h18"/><circle cx="12" cy="6" r="2"/></svg>
+        <span class="nav-tip">Инфраструктура</span>
+      </button>
       <span class="nav-sep"></span>
     </nav>
     <aside id="sidebar">
@@ -611,12 +697,69 @@
         <button type="button" class="pill" data-section="params">Параметры</button>
         <button type="button" class="pill" data-section="result">Результат</button>
         <button type="button" class="pill" data-section="project">Проект</button>
+        <button type="button" class="pill" data-section="building">Застройка</button>
+        <button type="button" class="pill" data-section="infra">Инфраструктура</button>
       </nav>
       <!-- Участок -->
       <div class="card" data-section="site">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3zM3 9h18M9 21V9"/></svg>Участок</h3>
         <button id="drawBtn" class="btn btn-primary">Нарисовать участок</button>
         <button id="clearBtn" class="btn btn-danger" disabled>Очистить</button>
+      </div>
+
+      <!-- Контекстный слой -->
+      <div class="card" data-section="site">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>Контекст окружения</h3>
+        <div class="field">
+          <span class="label">Тип объекта</span>
+          <select id="ctx_draw_type">
+            <option value="road_existing">Существующая дорога</option>
+            <option value="building_exist">Существующее здание</option>
+            <option value="school_exist">Существующая школа</option>
+            <option value="kindergarten_exist">Существующий ДОУ</option>
+            <option value="clinic_exist">Существующая поликлиника</option>
+            <option value="green_exist">Существующее озеленение</option>
+            <option value="water_exist">Водный объект</option>
+            <option value="cadastral">Кадастровый участок</option>
+            <option value="utility_line">Инженерная сеть</option>
+          </select>
+        </div>
+        <div class="ctx-import-row">
+          <button id="ctx_draw_btn" class="btn">✏️ Нарисовать</button>
+          <button id="ctx_import_btn" class="btn">📂 Импорт GeoJSON</button>
+        </div>
+        <input type="file" id="ctx_file_input" accept=".geojson,.json" hidden />
+        <p class="hint">Объекты окружения видны на карте и влияют на социальный баланс.</p>
+      </div>
+
+      <!-- ЗОУИТ -->
+      <div class="card" data-section="site">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10"/><path d="M16 2v4M8 2v4M3 10h18M21.4 18.6L20 20l1.4 1.4L22.8 20z"/></svg>ЗОУИТ</h3>
+        <div class="field">
+          <span class="label">Тип ЗОУИТ</span>
+          <select id="zouit_type_select">
+            <option value="power_line">Охранная зона ЛЭП</option>
+            <option value="sanitary">Санитарно-защитная зона</option>
+            <option value="water_prot">Водоохранная зона</option>
+            <option value="utility_zone">Охранная зона инж. сети</option>
+            <option value="heritage">Зона культурного наследия</option>
+            <option value="airport">Зона аэропорта</option>
+            <option value="flood">Зона затопления</option>
+            <option value="red_line">Красная линия</option>
+            <option value="servitude">Сервитут</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="label">Буфер (для линий), м</span>
+          <input type="number" id="zouit_buffer" value="20" min="0" step="5" />
+        </div>
+        <div class="ctx-import-row">
+          <button id="zouit_draw_btn" class="btn">✏️ Нарисовать зону</button>
+          <button id="zouit_import_btn" class="btn">📂 Импорт GeoJSON</button>
+        </div>
+        <input type="file" id="zouit_file_input" accept=".geojson,.json" hidden />
+        <button id="zouit_calc_btn" class="btn" style="margin-top:var(--sp-2)">⚡ Рассчитать конфликты</button>
+        <p class="hint">ЗОУИТ ограничивают строительство. Конфликты со зданиями отображаются в «Результате».</p>
       </div>
 
       <!-- Пресеты -->
@@ -719,7 +862,7 @@
             <div class="m-value" id="density">-</div>
           </div>
         </div>
-        <div id="zoneBreakdown"></div>
+        <div id="resultsPanel"></div>
         <p class="hint">Клик по кварталу меняет зону: жилая → общественная → озеленение.</p>
       </div>
 
@@ -761,6 +904,157 @@
         <p class="hint" id="licenseInfo">Активировано.</p>
         <button id="deactivateBtn" class="btn btn-ghost">Сбросить активацию</button>
       </div>
+
+      <!-- ═══════════════════════════════════════════════
+           ВКЛАДКА «ЗАСТРОЙКА» (Промпт 1.1–1.4)
+           ═══════════════════════════════════════════════ -->
+
+      <!-- Контейнер морфотипов по зонам (заполняется buildingPanel.js) -->
+      <div id="buildingZonesHost"></div>
+
+      <!-- Квартирография -->
+      <div class="card" data-section="building">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Квартирография</h3>
+        <table style="width:100%;font-size:var(--fs-sm);border-collapse:collapse">
+          <tr style="color:var(--text-faint);font-size:var(--fs-xs)">
+            <td>Тип</td><td style="text-align:right">Доля %</td><td style="text-align:right">Площадь м²</td>
+          </tr>
+          <tr>
+            <td style="padding:3px 0">Студия</td>
+            <td style="text-align:right"><input type="number" id="bp_apt_studio_share"  value="10" min="0" max="100" step="5" style="width:56px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /></td>
+            <td style="text-align:right"><input type="number" id="bp_apt_studio_area"   value="28" min="15" max="80" step="1"  style="width:56px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /></td>
+          </tr>
+          <tr>
+            <td style="padding:3px 0">1-комн.</td>
+            <td style="text-align:right"><input type="number" id="bp_apt_oneRoom_share" value="35" min="0" max="100" step="5" style="width:56px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /></td>
+            <td style="text-align:right"><input type="number" id="bp_apt_oneRoom_area"  value="42" min="20" max="100" step="1" style="width:56px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /></td>
+          </tr>
+          <tr>
+            <td style="padding:3px 0">2-комн.</td>
+            <td style="text-align:right"><input type="number" id="bp_apt_twoRoom_share" value="40" min="0" max="100" step="5" style="width:56px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /></td>
+            <td style="text-align:right"><input type="number" id="bp_apt_twoRoom_area"  value="65" min="30" max="150" step="1" style="width:56px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /></td>
+          </tr>
+          <tr>
+            <td style="padding:3px 0">3-комн.</td>
+            <td style="text-align:right"><input type="number" id="bp_apt_threeRoom_share" value="15" min="0" max="100" step="5" style="width:56px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /></td>
+            <td style="text-align:right"><input type="number" id="bp_apt_threeRoom_area"  value="90" min="50" max="200" step="1" style="width:56px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /></td>
+          </tr>
+        </table>
+        <div class="row" style="margin-top:var(--sp-2)">
+          <span class="label">Сумма долей</span>
+          <span id="bp_apt_sum" style="font-weight:700;color:var(--ok)">100%</span>
+        </div>
+        <button id="bp_apt_recalc" class="btn" style="margin-top:var(--sp-2)">Пересчитать квартирографию</button>
+      </div>
+
+      <!-- Встроенные помещения -->
+      <div class="card" data-section="building">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Встроенные помещения</h3>
+        <div class="row" style="margin:var(--sp-2) 0">
+          <span class="label"><input type="checkbox" id="bp_emb_retail" style="margin-right:6px" />Встроенная коммерция</span>
+          <input type="number" id="bp_emb_retail_area" value="500" min="0" step="50" style="width:72px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /> м²
+        </div>
+        <div class="row" style="margin:var(--sp-2) 0">
+          <span class="label"><input type="checkbox" id="bp_emb_kindergarten" style="margin-right:6px" />Встроенное ДОУ</span>
+          <input type="number" id="bp_emb_kindergarten_area" value="800" min="0" step="50" style="width:72px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /> м²
+        </div>
+        <div class="row" style="margin:var(--sp-2) 0">
+          <span class="label"><input type="checkbox" id="bp_emb_clinic" style="margin-right:6px" />Встроенная поликлиника</span>
+          <input type="number" id="bp_emb_clinic_area" value="1200" min="0" step="50" style="width:72px;text-align:right;padding:4px 6px;font-size:var(--fs-sm);border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)" /> м²
+        </div>
+      </div>
+
+      <!-- Кнопка регенерации -->
+      <div class="card" data-section="building">
+        <button id="bp_regenerate" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.75"/></svg>
+          Регенерировать застройку
+        </button>
+        <p class="hint" style="margin-top:var(--sp-2)">Пересоздаёт участки и пятна зданий для всех кварталов с текущими параметрами.</p>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════
+           ВКЛАДКА «ИНФРАСТРУКТУРА» (Промпт 2.1–2.2)
+           ══════════════════════════════════════════════════ -->
+
+      <!-- Потребность и обеспеченность -->
+      <div class="card" data-section="infra">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Потребность и обеспеченность
+        </h3>
+        <div style="overflow-x:auto">
+          <table class="si-balance-table">
+            <thead>
+              <tr>
+                <th>Объект</th>
+                <th class="si-num">На 1000</th>
+                <th class="si-num">Потреб.</th>
+                <th class="si-num">Имеется</th>
+                <th class="si-num">Созд.</th>
+                <th class="si-num">Дефицит</th>
+              </tr>
+            </thead>
+            <tbody id="si_balance_table">
+              <tr><td colspan="6" style="color:var(--text-faint);text-align:center;padding:var(--sp-3)">Нет данных</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <button id="si_toggle_radii" class="btn" style="margin-top:var(--sp-3)">Скрыть радиусы</button>
+      </div>
+
+      <!-- Разместить объект в проекте -->
+      <div class="card" data-section="infra">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg>
+          Разместить объект
+        </h3>
+        <div class="field">
+          <span class="label">Тип объекта</span>
+          <select id="si_type_select">
+            <option value="">— выбрать —</option>
+            <option value="kindergarten">🏛 ДОУ (детский сад)</option>
+            <option value="school">🏫 Школа</option>
+            <option value="clinic">🏥 Поликлиника (взрослая)</option>
+            <option value="clinic_child">👶 Поликлиника (детская)</option>
+            <option value="sport">🏋️ ФОК / спортзал</option>
+            <option value="culture">🎭 КДЦ</option>
+            <option value="police">🚔 Полиция</option>
+            <option value="fire">🚒 Пожарная часть</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="label">Вместимость</span>
+          <input type="number" id="si_capacity" value="100" min="1" step="10" />
+        </div>
+        <div class="row btn-pair" style="margin-top:var(--sp-3)">
+          <button id="si_place_btn" class="btn btn-primary">📍 В проект</button>
+          <button id="si_add_ctx_btn" class="btn">🗺 Существующий</button>
+        </div>
+        <p class="hint">«В проект» — проектируемый объект. «Существующий» — объект окружения.</p>
+      </div>
+
+      <!-- Размещённые объекты в проекте -->
+      <div class="card" data-section="infra">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Объекты в проекте
+        </h3>
+        <div id="si_project_list">
+          <p class="hint">Нет размещённых объектов.</p>
+        </div>
+      </div>
+
+      <!-- Объекты окружения -->
+      <div class="card" data-section="infra">
+        <h3>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Существующие объекты окружения
+        </h3>
+        <div id="si_context_list">
+          <p class="hint">Нет объектов окружения.</p>
+        </div>
+      </div>
     </aside>
 
     <div id="map">
@@ -779,6 +1073,54 @@
   <script src="./node_modules/leaflet/dist/leaflet.js"></script>
   <script src="./node_modules/leaflet-draw/dist/leaflet.draw.js"></script>
   <script src="./node_modules/@turf/turf/turf.min.js"></script>
+
+  <!-- ═══ ДИАГНОСТИКА: перехват ошибок, видимый на экране ═══ -->
+  <script>
+    // Создаём панель диагностики сразу в DOM
+    var _diagBox = document.createElement('div');
+    _diagBox.id = '_diagBox';
+    _diagBox.style.cssText = [
+      'position:fixed','bottom:0','left:0','right:0','z-index:99999',
+      'background:#1a1a2e','color:#eee','font:13px/1.5 monospace',
+      'max-height:220px','overflow-y:auto','padding:10px 14px',
+      'border-top:2px solid #e74c3c','display:none'
+    ].join(';');
+    document.body.appendChild(_diagBox);
+
+    function _diagLog(msg, ok) {
+      _diagBox.style.display = 'block';
+      var line = document.createElement('div');
+      line.style.color = ok === true ? '#2ecc71' : ok === false ? '#e74c3c' : '#f39c12';
+      line.textContent = (ok === true ? '✅ ' : ok === false ? '❌ ' : '⚠ ') + msg;
+      _diagBox.appendChild(line);
+      _diagBox.scrollTop = _diagBox.scrollHeight;
+    }
+
+    // Перехват ВСЕХ ошибок JS
+    window.onerror = function(msg, src, line, col, err) {
+      _diagLog('ERROR: ' + msg + ' | ' + (src||'').split('/').pop() + ':' + line, false);
+      return false;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      _diagLog('PROMISE ERROR: ' + (e.reason && e.reason.message || e.reason), false);
+    });
+
+    // Базовая проверка зависимостей
+    _diagLog('L (Leaflet): ' + (typeof L !== 'undefined' ? 'OK' : 'НЕ ЗАГРУЖЕН'), typeof L !== 'undefined');
+    _diagLog('L.Draw: ' + (typeof L !== 'undefined' && L.Draw ? 'OK' : 'НЕ ЗАГРУЖЕН'), typeof L !== 'undefined' && !!L.Draw);
+    _diagLog('turf: ' + (typeof turf !== 'undefined' ? 'OK' : 'НЕ ЗАГРУЖЕН'), typeof turf !== 'undefined');
+    _diagLog('#map element: ' + (document.getElementById('map') ? 'OK' : 'ОТСУТСТВУЕТ'), !!document.getElementById('map'));
+
+    // Метка — если app.js запустится, он уберёт эту строку
+    window._appStarted = false;
+    setTimeout(function() {
+      if (!window._appStarted) {
+        _diagLog('app.js НЕ ЗАПУСТИЛСЯ за 3 сек — скорее всего ошибка импорта модуля', false);
+      }
+    }, 3000);
+  </script>
+  <!-- ═══════════════════════════════════════════════════════════ -->
+
   <script type="module" src="./js/app.js"></script>
   <script defer src="./js/ui/chrome.js"></script>
 </body>

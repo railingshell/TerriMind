@@ -9,6 +9,8 @@ import { notifyOk, notifyError, notifyInfo } from '../core/toast.js';
 import { buildGeoJSON } from './geojson.js';
 import { collectParams } from './params.js';
 import { loadAny } from './loader.js';
+import { getRegModel } from '../renderer/features/regulations/regModel.js';
+import { getBuildingParams, loadBuildingParams } from './params.js';
 
 export const PROJECT_FORMAT_VERSION = 2;
 const DRAFT_KEY = 'terrimind.draft';
@@ -29,6 +31,12 @@ export function buildProject(extra = {}) {
     version: PROJECT_FORMAT_VERSION,
     savedAt: new Date().toISOString(),
     params: collectParams(),
+    regulation:      getRegModel().serialize(),    // нормативные настройки
+    buildingParams:  getBuildingParams(),          // параметры застройки (Промпт 1.3)
+    socialObjects:   state.socialObjects.map(o => ({ id:o.id, type:o.type, name:o.name, lat:o.lat, lng:o.lng, capacity:o.capacity })),
+    contextObjects:  state.contextObjects.map(o => ({ id:o.id, type:o.type, name:o.name, lat:o.lat, lng:o.lng, capacity:o.capacity })),
+    contextLayer:    state.contextLayer.map(o => ({ id:o.id, contextType:o.contextType, label:o.label, status:o.status, capacity:o.capacity, geometry:o.geometry, includeInBalance:o.includeInBalance, note:o.note })),
+    zouitLayers:     state.zouitLayers.map(z => ({ id:z.id, zouitType:z.zouitType, geometry:z.geometry, bufferM:z.bufferM, allowConstruction:z.allowConstruction, allowRoads:z.allowRoads, note:z.note })),
     stats: {
       parcelArea: textOf('parcelArea'),
       blockCount: textOf('blockCount'),

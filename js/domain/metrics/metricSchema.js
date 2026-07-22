@@ -2,11 +2,12 @@
 // Чистые фабрики. Каждый показатель самодостаточен и доказуем.
 
 export const METRIC_CATEGORY = Object.freeze({
-  TERRITORY: 'territory',
-  BUILDING: 'building',
-  POPULATION: 'population',
-  COEFFICIENT: 'coefficient',
-  BALANCE: 'balance'
+  TERRITORY:    'territory',
+  BUILDING:     'building',
+  POPULATION:   'population',
+  COEFFICIENT:  'coefficient',
+  BALANCE:      'balance',
+  APARTMENTS:   'apartments'   // Квартирография (Промпт 1.4)
 });
 
 export const VALIDITY = Object.freeze({

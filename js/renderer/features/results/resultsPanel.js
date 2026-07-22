@@ -8,10 +8,14 @@ import { METRIC_CATEGORY } from '../../../domain/metrics/metricSchema.js';
 import { checkCompliance } from '../../../domain/regulations/ruleSchema.js';
 import { getRegModel } from '../regulations/regModel.js';
 import { barChart, donutChart, legend, color } from '../charts.js';
+import { ZONES } from '../../../zones/zoneConfig.js';
+import { getZouitConflicts, getAvailableAreaM2, getZouitType, focusConflict } from '../../../domain/zouit.js';
+import { state } from '../../../core/state.js';
 
 const CATEGORY_LABEL = {
-  [METRIC_CATEGORY.TERRITORY]: 'Территория',
-  [METRIC_CATEGORY.BUILDING]: 'Застройка',
+  [METRIC_CATEGORY.TERRITORY]:   'Территория',
+  [METRIC_CATEGORY.BUILDING]:    'Застройка',
+  [METRIC_CATEGORY.APARTMENTS]:  'Квартирография',
   [METRIC_CATEGORY.POPULATION]: 'Население и обеспеченность',
   [METRIC_CATEGORY.COEFFICIENT]: 'Коэффициенты',
   [METRIC_CATEGORY.BALANCE]: 'Баланс территории'
@@ -98,6 +102,10 @@ export function renderResults(metrics) {
     html.push('<div class="rp-chart-row">' + donutChart(d, { size: 110 }) + legend(d) + '</div></div>');
   }
 
+  // ── Квартирография (Промпт 1.4) ──
+  const aptSection = renderApartmentSection(byId, metrics.metrics);
+  if (aptSection) html.push(aptSection);
+
   // ── Полные показатели по категориям ──
   const order = [METRIC_CATEGORY.TERRITORY, METRIC_CATEGORY.BUILDING, METRIC_CATEGORY.POPULATION, METRIC_CATEGORY.BALANCE];
   for (const cat of order) {
@@ -111,8 +119,81 @@ export function renderResults(metrics) {
     html.push('</table></div>');
   }
 
+  // ── Секция ЗОУИТ и ограничения ──
+  html.push(renderZouitSection());
+
   html.push('<div class="rp-updated">Обновлено: ' + new Date().toLocaleTimeString('ru-RU') + '</div>');
   host.innerHTML = html.join('');
+
+  // Навешиваем кнопки «Показать» после вставки HTML
+  host.querySelectorAll('.rp-zouit-focus').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const conflicts = getZouitConflicts();
+      if (conflicts && conflicts[idx]) focusConflict(conflicts[idx]);
+    });
+  });
+}
+}
+
+/** Секция квартирографии с таблицей и donut-диаграммой. */
+function renderApartmentSection(byId, allMetrics) {
+  const total = byId.apartments_total;
+  if (!total || !total.raw) return null;
+
+  const types = [
+    { id: 'apartments_studio', label: 'Студия' },
+    { id: 'apartments_1k',     label: '1-комн.' },
+    { id: 'apartments_2k',     label: '2-комн.' },
+    { id: 'apartments_3k',     label: '3-комн.' }
+  ];
+
+  const totalCount = (total.raw || 0);
+  const rows = types.map((t, i) => {
+    const m = byId[t.id];
+    if (!m || m.raw === null) return '';
+    const share = totalCount > 0 ? Math.round(m.raw / totalCount * 100) : 0;
+    return `<tr>
+      <td>${esc(t.label)}</td>
+      <td class="rp-v">${m.raw.toLocaleString('ru-RU')}</td>
+      <td class="rp-v">${share}%</td>
+    </tr>`;
+  }).join('');
+
+  // Donut данные
+  const chartData = types.map((t, i) => {
+    const m = byId[t.id];
+    return { label: t.label, value: (m && m.raw) || 0, color: color(i) };
+  }).filter(d => d.value > 0);
+
+  // Норматив sqm_per_person
+  const sqm = byId.sqm_per_person_apts;
+  let normRow = '';
+  if (sqm && sqm.raw !== null) {
+    const val = sqm.rounded;
+    const cls = val < 18 ? 'rp-bad' : val > 40 ? 'rp-warn' : 'rp-ok';
+    const msg = val < 18 ? '⚠️ Ниже нормы 18 м²/чел' : val > 40 ? '📊 Высокая обеспеченность' : '✓ В норме';
+    normRow = `<div class="rp-viol rp-${cls}" style="margin-top:var(--sp-2)">${msg} — ${val} м²/чел</div>`;
+  }
+
+  const avgM = byId.avg_apartment_area;
+  const avgStr = (avgM && avgM.raw !== null) ? `Средняя площадь: <b>${avgM.rounded} м²</b>` : '';
+
+  return `<div class="rp-section">
+    <div class="rp-h">Квартирография</div>
+    <div class="rp-chart-row">
+      ${donutChart(chartData, { size: 100 })}
+      <div style="flex:1">
+        <table class="rp-table">
+          <tr><th>Тип</th><th class="rp-v">Кол-во</th><th class="rp-v">Доля</th></tr>
+          ${rows}
+          <tr style="font-weight:700"><td>Всего</td><td class="rp-v">${totalCount.toLocaleString('ru-RU')}</td><td class="rp-v">100%</td></tr>
+        </table>
+        <div class="rp-expl" style="margin-top:var(--sp-2)">${avgStr}</div>
+        ${normRow}
+      </div>
+    </div>
+  </div>`;
 }
 
 function coefficientCard(m, comp) {
@@ -160,10 +241,67 @@ function zoneShares(byId) {
   for (const [id, m] of Object.entries(byId)) {
     if (!id.startsWith('zone_area_')) continue;
     if (!m.raw) continue;
-    out.push({ label: id.replace('zone_area_', ''), value: m.raw, color: color(i++) });
+    const zoneKey = id.replace('zone_area_', '');
+    const label = (ZONES[zoneKey] && ZONES[zoneKey].label) || zoneKey;
+    out.push({ label, value: m.raw, color: color(i++) });
   }
   return out;
 }
 
 function num(m) { return m && Number.isFinite(m.raw) ? m.raw : 0; }
-function esc(s) { return String(s == null ? '' : s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c])); }
+function esc(s) { return String(s == null ? '' : s).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/** Секция ЗОУИТ и ограничения в панели результатов. */
+function renderZouitSection() {
+  const conflicts    = getZouitConflicts() || [];
+  const availableM2  = getAvailableAreaM2();
+  const zouitLayers  = state.zouitLayers || [];
+
+  if (!zouitLayers.length && !conflicts.length && availableM2 === null) return '';
+
+  const parts = [];
+  parts.push('<div class="rp-section"><div class="rp-h">ЗОУИТ и ограничения</div>');
+
+  // Доступная площадь
+  if (availableM2 !== null) {
+    const cls = zouitLayers.length ? 'rp-warn' : '';
+    parts.push(`<div class="rp-viol ${cls}" style="margin-bottom:var(--sp-2)">
+      Доступная для застройки площадь: <b>${availableM2.toLocaleString('ru-RU')} м²</b>
+    </div>`);
+  }
+
+  // Таблица ЗОУИТ
+  if (zouitLayers.length) {
+    parts.push('<table class="rp-table"><tr><th>Тип ЗОУИТ</th><th class="rp-v">Стр.</th><th class="rp-v">Дороги</th></tr>');
+    for (const z of zouitLayers) {
+      const def = getZouitType(z.zouitType);
+      const constr = z.allowConstruction === false ? '<span style="color:var(--danger)">⛔</span>' : '<span style="color:var(--ok)">✓</span>';
+      const roads  = z.allowRoads        === false ? '<span style="color:var(--danger)">⛔</span>' : '<span style="color:var(--ok)">✓</span>';
+      parts.push(`<tr><td>${esc(def.label)}</td><td class="rp-v">${constr}</td><td class="rp-v">${roads}</td></tr>`);
+    }
+    parts.push('</table>');
+  }
+
+  // Конфликты
+  if (conflicts.length) {
+    parts.push(`<div class="rp-h" style="margin-top:var(--sp-3)">Конфликты (${conflicts.length})</div>`);
+    parts.push('<div class="rp-violations">');
+    conflicts.forEach((c, idx) => {
+      const sev = c.severity === 'critical'
+        ? '<span style="color:var(--danger)">⛔ Критично</span>'
+        : '<span style="color:var(--warn)">⚠ Предупреждение</span>';
+      const areaStr = c.area > 0 ? ` — ${c.area} м²` : '';
+      const type = c.conflictType === 'building_in_zone' ? 'Здание в зоне' : 'Дорога в зоне';
+      parts.push(`<div class="rp-viol">
+        ${sev} ${esc(type)}: ${esc(c.zouitLabel || c.zouitId)}${areaStr}
+        <button class="rp-zouit-focus" data-idx="${idx}" style="margin-left:8px;font-size:var(--fs-xs);cursor:pointer;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px 8px;color:var(--text)">Показать</button>
+      </div>`);
+    });
+    parts.push('</div>');
+  } else if (zouitLayers.length) {
+    parts.push('<p class="hint" style="margin-top:var(--sp-2)">✓ Конфликтов не обнаружено</p>');
+  }
+
+  parts.push('</div>');
+  return parts.join('');
+}

@@ -163,7 +163,10 @@ class DocumentStore {
     return idx.documents.map((d) => {
       const missing = !fs.existsSync(path.join(this.pdfDir, d.storedName));
       const base = Object.assign({}, d, { missing });
-      if (!withIndex) { delete base.index; }
+      if (!withIndex) {
+        delete base.index;  // chunks — могут быть очень большими
+        delete base.rules;  // extracted rules — тоже тяжёлые, не нужны в списке
+      }
       return base;
     });
   }

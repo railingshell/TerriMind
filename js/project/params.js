@@ -1,7 +1,74 @@
 // project/params.js — параметры UI: сбор/применение/дефолты + пресеты.
+// Расширен: buildingParams (Промпт 1.3) — параметры застройки, морфотипы, квартирография.
 
 import { $, getNum, getStr, setVal } from '../core/dom.js';
 import { state } from '../core/state.js';
+
+// ── Параметры застройки ──────────────────────────────────────────────────────
+const BUILDING_PARAMS_KEY = 'terrimind.buildingParams';
+
+export const BUILDING_PARAM_DEFAULTS = {
+  setbackMain:  5,
+  setbackLocal: 3,
+  setbackSide:  2,
+  zones: {
+    residential: { morphotype: 'section',     floors: 9,  residShare: 75, commShare: 10, frontSetback: 3, sideSetback: 4, frontageWidth: 20, buildingCoverage: 0.35 },
+    commercial:  { morphotype: 'perimeter',   floors: 6,  residShare: 10, commShare: 80, frontSetback: 0, sideSetback: 3, frontageWidth: 35, buildingCoverage: 0.55 },
+    mixed:       { morphotype: 'freestanding',floors: 8,  residShare: 50, commShare: 40, frontSetback: 2, sideSetback: 4, frontageWidth: 25, buildingCoverage: 0.40 },
+    public:      { morphotype: 'freestanding',floors: 4,  residShare:  0, commShare: 20, frontSetback: 5, sideSetback: 5, frontageWidth: 30, buildingCoverage: 0.30 }
+  },
+  apartmentMix: {
+    studio:   { share: 0.10, avgArea: 28 },
+    oneRoom:  { share: 0.35, avgArea: 42 },
+    twoRoom:  { share: 0.40, avgArea: 65 },
+    threeRoom:{ share: 0.15, avgArea: 90 }
+  },
+  embedded: {
+    retail:        { enabled: false, areaM2: 500  },
+    kindergarten:  { enabled: false, areaM2: 800  },
+    clinic:        { enabled: false, areaM2: 1200 }
+  }
+};
+
+let _buildingParams = null;
+
+export function getBuildingParams() {
+  if (!_buildingParams) loadBuildingParams();
+  return _buildingParams;
+}
+
+export function setBuildingParams(patch) {
+  if (!_buildingParams) loadBuildingParams();
+  // Deep merge для zones и apartmentMix
+  _buildingParams = deepMerge(_buildingParams, patch);
+}
+
+export function loadBuildingParams() {
+  try {
+    const raw = localStorage.getItem(BUILDING_PARAMS_KEY);
+    _buildingParams = raw
+      ? deepMerge(JSON.parse(JSON.stringify(BUILDING_PARAM_DEFAULTS)), JSON.parse(raw))
+      : JSON.parse(JSON.stringify(BUILDING_PARAM_DEFAULTS));
+  } catch (e) {
+    _buildingParams = JSON.parse(JSON.stringify(BUILDING_PARAM_DEFAULTS));
+  }
+}
+
+export function saveBuildingParamsToStorage() {
+  try { localStorage.setItem(BUILDING_PARAMS_KEY, JSON.stringify(_buildingParams)); } catch (e) {}
+}
+
+function deepMerge(target, source) {
+  const out = Object.assign({}, target);
+  for (const key of Object.keys(source || {})) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      out[key] = deepMerge(target[key] || {}, source[key]);
+    } else {
+      out[key] = source[key];
+    }
+  }
+  return out;
+}
 
 export const PARAM_DEFAULTS = {
   scenario: 'balanced',

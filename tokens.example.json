@@ -1,0 +1,7 @@
+{
+  "_comment": "Скопируйте этот файл как tokens.json и замените токены на реальные.",
+  "tokens": [
+    "REPLACE-WITH-REAL-TOKEN-1",
+    "REPLACE-WITH-REAL-TOKEN-2"
+  ]
+}

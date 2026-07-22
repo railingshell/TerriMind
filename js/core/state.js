@@ -16,9 +16,26 @@ export const state = {
   roads: null,             // общий полигон дорог (совместимость)
   innerRoads: [],          // Feature[] внутриквартальные дорожки/тротуары
 
+  // Участки, дворы, здания (Промпт 1.1–1.2)
+  plots:      {},          // { [blockId]: Plot[] }     — земельные участки
+  courtyards: {},          // { [blockId]: Feature }    — дворы
+  buildings:  {},          // { [plotId]: Building }    — пятна зданий
+
+  // Социальная инфраструктура (Промпт 2.1–2.2)
+  socialObjects:   [],     // размещённые в проекте объекты { id, type, name, lat, lng, capacity }
+  contextObjects:  [],     // существующие объекты окружения { id, type, name, lat, lng, capacity }
+
+  // Контекстный слой окружения (contextLayer.js)
+  contextLayer:    [],     // { id, contextType, label, status, capacity, geometry, includeInBalance, note }
+
+  // ЗОУИТ — зоны с особыми условиями использования территории (zouit.js)
+  zouitLayers:     [],     // { id, zouitType, geometry, bufferM, allowConstruction, allowRoads, note }
+
   // Флаги
   dirty: false,            // несохранённые изменения
   showLabels: true,        // показывать номера кварталов
+  showPlots: true,         // показывать участки
+  showBuildings: true,     // показывать здания
   currentProjectPath: null // путь текущего .terrimind.json (для автосейва)
 };
 
@@ -31,19 +48,31 @@ export function resetGenerated() {
   state.roadsService = null;
   state.roads = null;
   state.innerRoads = [];
+  state.plots      = {};
+  state.courtyards = {};
+  state.buildings  = {};
 }
 
 // Полный сброс
 export function resetAll() {
-  state.parcel = null;
-  state.parcelFeature = null;
+  state.parcel         = null;
+  state.parcelFeature  = null;
+  state.socialObjects  = [];
+  state.contextObjects = [];
+  state.contextLayer   = [];
+  state.zouitLayers    = [];
   resetGenerated();
 }
 
-// Пометка изменений с событием
+// Пометка изменений с событием.
+// 'dirty:change' — только при реальном переходе clean→dirty или dirty→clean (для UI/IPC).
+// 'project:change' — при каждом изменении (для дебаунса автосейва).
 export function markDirty() {
-  if (!state.dirty) { state.dirty = true; emit('dirty:change', true); }
-  else emit('dirty:change', true);
+  emit('project:change');
+  if (!state.dirty) {
+    state.dirty = true;
+    emit('dirty:change', true);
+  }
 }
 export function markSaved() {
   state.dirty = false;

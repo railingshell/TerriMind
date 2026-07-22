@@ -1,21 +1,32 @@
 // licensing.js — модуль лицензирования (main process).
 // Централизует: генерацию machineId, локальную проверку токенов (MVP Local Mode),
 // и заготовку под серверную проверку (verifyTokenRemotely).
-// Токены НЕ разбросаны по коду — только здесь.
+// Токены НЕ хранятся в коде — загружаются из tokens.json (вне git).
 
 const os = require('os');
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 
 // ============================================================
-// Local Mode: тестовые валидные токены (Этап 3)
-// Заменить/расширить при выдаче клиентам. Единый источник правды.
+// Local Mode: загрузка токенов из tokens.json (gitignored).
+// Для продакшена — переключиться на verifyTokenRemotely.
 // ============================================================
-const VALID_TOKENS = new Set([
-  'TERRA-MVP-2026-DEMO',
-  'TERRA-CLIENT-0001',
-  'FORMYBROTHER',
-  'ADMINEDBYROGAART'
-]);
+function loadTokens() {
+  const tokensPath = path.join(__dirname, 'tokens.json');
+  try {
+    const data = JSON.parse(fs.readFileSync(tokensPath, 'utf-8'));
+    const list = Array.isArray(data.tokens) ? data.tokens : [];
+    return new Set(list.map(t => (t || '').toString().trim().toUpperCase()).filter(Boolean));
+  } catch (e) {
+    // Файл отсутствует или повреждён — режим без токенов (будет ошибка активации)
+    console.warn('[licensing] tokens.json не найден или повреждён:', e.message);
+    return new Set();
+  }
+}
+
+// Кэш: загружаем один раз при старте приложения
+const VALID_TOKENS = loadTokens();
 
 const APP_NAME = 'TerriMind';
 
