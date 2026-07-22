@@ -9,6 +9,8 @@ import { checkCompliance } from '../../../domain/regulations/ruleSchema.js';
 import { getRegModel } from '../regulations/regModel.js';
 import { barChart, donutChart, legend, color } from '../charts.js';
 import { ZONES } from '../../../zones/zoneConfig.js';
+import { getZouitConflicts, getAvailableAreaM2, getZouitType, focusConflict } from '../../../domain/zouit.js';
+import { state } from '../../../core/state.js';
 
 const CATEGORY_LABEL = {
   [METRIC_CATEGORY.TERRITORY]:   'Территория',
@@ -117,8 +119,21 @@ export function renderResults(metrics) {
     html.push('</table></div>');
   }
 
+  // ── Секция ЗОУИТ и ограничения ──
+  html.push(renderZouitSection());
+
   html.push('<div class="rp-updated">Обновлено: ' + new Date().toLocaleTimeString('ru-RU') + '</div>');
   host.innerHTML = html.join('');
+
+  // Навешиваем кнопки «Показать» после вставки HTML
+  host.querySelectorAll('.rp-zouit-focus').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const conflicts = getZouitConflicts();
+      if (conflicts && conflicts[idx]) focusConflict(conflicts[idx]);
+    });
+  });
+}
 }
 
 /** Секция квартирографии с таблицей и donut-диаграммой. */
@@ -235,3 +250,58 @@ function zoneShares(byId) {
 
 function num(m) { return m && Number.isFinite(m.raw) ? m.raw : 0; }
 function esc(s) { return String(s == null ? '' : s).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/** Секция ЗОУИТ и ограничения в панели результатов. */
+function renderZouitSection() {
+  const conflicts    = getZouitConflicts() || [];
+  const availableM2  = getAvailableAreaM2();
+  const zouitLayers  = state.zouitLayers || [];
+
+  if (!zouitLayers.length && !conflicts.length && availableM2 === null) return '';
+
+  const parts = [];
+  parts.push('<div class="rp-section"><div class="rp-h">ЗОУИТ и ограничения</div>');
+
+  // Доступная площадь
+  if (availableM2 !== null) {
+    const cls = zouitLayers.length ? 'rp-warn' : '';
+    parts.push(`<div class="rp-viol ${cls}" style="margin-bottom:var(--sp-2)">
+      Доступная для застройки площадь: <b>${availableM2.toLocaleString('ru-RU')} м²</b>
+    </div>`);
+  }
+
+  // Таблица ЗОУИТ
+  if (zouitLayers.length) {
+    parts.push('<table class="rp-table"><tr><th>Тип ЗОУИТ</th><th class="rp-v">Стр.</th><th class="rp-v">Дороги</th></tr>');
+    for (const z of zouitLayers) {
+      const def = getZouitType(z.zouitType);
+      const constr = z.allowConstruction === false ? '<span style="color:var(--danger)">⛔</span>' : '<span style="color:var(--ok)">✓</span>';
+      const roads  = z.allowRoads        === false ? '<span style="color:var(--danger)">⛔</span>' : '<span style="color:var(--ok)">✓</span>';
+      parts.push(`<tr><td>${esc(def.label)}</td><td class="rp-v">${constr}</td><td class="rp-v">${roads}</td></tr>`);
+    }
+    parts.push('</table>');
+  }
+
+  // Конфликты
+  if (conflicts.length) {
+    parts.push(`<div class="rp-h" style="margin-top:var(--sp-3)">Конфликты (${conflicts.length})</div>`);
+    parts.push('<div class="rp-violations">');
+    conflicts.forEach((c, idx) => {
+      const sev = c.severity === 'critical'
+        ? '<span style="color:var(--danger)">⛔ Критично</span>'
+        : '<span style="color:var(--warn)">⚠ Предупреждение</span>';
+      const areaStr = c.area > 0 ? ` — ${c.area} м²` : '';
+      const type = c.conflictType === 'building_in_zone' ? 'Здание в зоне' : 'Дорога в зоне';
+      parts.push(`<div class="rp-viol">
+        ${sev} ${esc(type)}: ${esc(c.zouitLabel || c.zouitId)}${areaStr}
+        <button class="rp-zouit-focus" data-idx="${idx}" style="margin-left:8px;font-size:var(--fs-xs);cursor:pointer;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px 8px;color:var(--text)">Показать</button>
+      </div>`);
+    });
+    parts.push('</div>');
+  } else if (zouitLayers.length) {
+    parts.push('<p class="hint" style="margin-top:var(--sp-2)">✓ Конфликтов не обнаружено</p>');
+  }
+
+  parts.push('</div>');
+  return parts.join('');
+}

@@ -25,6 +25,12 @@ export const state = {
   socialObjects:   [],     // размещённые в проекте объекты { id, type, name, lat, lng, capacity }
   contextObjects:  [],     // существующие объекты окружения { id, type, name, lat, lng, capacity }
 
+  // Контекстный слой окружения (contextLayer.js)
+  contextLayer:    [],     // { id, contextType, label, status, capacity, geometry, includeInBalance, note }
+
+  // ЗОУИТ — зоны с особыми условиями использования территории (zouit.js)
+  zouitLayers:     [],     // { id, zouitType, geometry, bufferM, allowConstruction, allowRoads, note }
+
   // Флаги
   dirty: false,            // несохранённые изменения
   showLabels: true,        // показывать номера кварталов
@@ -49,10 +55,12 @@ export function resetGenerated() {
 
 // Полный сброс
 export function resetAll() {
-  state.parcel = null;
-  state.parcelFeature = null;
+  state.parcel         = null;
+  state.parcelFeature  = null;
   state.socialObjects  = [];
   state.contextObjects = [];
+  state.contextLayer   = [];
+  state.zouitLayers    = [];
   resetGenerated();
 }
 

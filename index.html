@@ -507,6 +507,10 @@
       align-items:center; justify-content:center; font-size:16px;
       box-shadow:0 2px 8px rgba(0,0,0,.35); border:2px solid rgba(255,255,255,.7); }
 
+    /* ── Контекстный слой + ЗОУИТ ── */
+    .ctx-import-row { display:flex; gap:var(--sp-2); flex-wrap:wrap; margin-top:var(--sp-2); }
+    .ctx-import-row .btn { flex:1; min-width:0; font-size:var(--fs-xs); padding:7px 6px; }
+
     /* Large rounded map (primary visual block) */
     #map {
       flex: 1; height: auto;
@@ -701,6 +705,61 @@
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3zM3 9h18M9 21V9"/></svg>Участок</h3>
         <button id="drawBtn" class="btn btn-primary">Нарисовать участок</button>
         <button id="clearBtn" class="btn btn-danger" disabled>Очистить</button>
+      </div>
+
+      <!-- Контекстный слой -->
+      <div class="card" data-section="site">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>Контекст окружения</h3>
+        <div class="field">
+          <span class="label">Тип объекта</span>
+          <select id="ctx_draw_type">
+            <option value="road_existing">Существующая дорога</option>
+            <option value="building_exist">Существующее здание</option>
+            <option value="school_exist">Существующая школа</option>
+            <option value="kindergarten_exist">Существующий ДОУ</option>
+            <option value="clinic_exist">Существующая поликлиника</option>
+            <option value="green_exist">Существующее озеленение</option>
+            <option value="water_exist">Водный объект</option>
+            <option value="cadastral">Кадастровый участок</option>
+            <option value="utility_line">Инженерная сеть</option>
+          </select>
+        </div>
+        <div class="ctx-import-row">
+          <button id="ctx_draw_btn" class="btn">✏️ Нарисовать</button>
+          <button id="ctx_import_btn" class="btn">📂 Импорт GeoJSON</button>
+        </div>
+        <input type="file" id="ctx_file_input" accept=".geojson,.json" hidden />
+        <p class="hint">Объекты окружения видны на карте и влияют на социальный баланс.</p>
+      </div>
+
+      <!-- ЗОУИТ -->
+      <div class="card" data-section="site">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10"/><path d="M16 2v4M8 2v4M3 10h18M21.4 18.6L20 20l1.4 1.4L22.8 20z"/></svg>ЗОУИТ</h3>
+        <div class="field">
+          <span class="label">Тип ЗОУИТ</span>
+          <select id="zouit_type_select">
+            <option value="power_line">Охранная зона ЛЭП</option>
+            <option value="sanitary">Санитарно-защитная зона</option>
+            <option value="water_prot">Водоохранная зона</option>
+            <option value="utility_zone">Охранная зона инж. сети</option>
+            <option value="heritage">Зона культурного наследия</option>
+            <option value="airport">Зона аэропорта</option>
+            <option value="flood">Зона затопления</option>
+            <option value="red_line">Красная линия</option>
+            <option value="servitude">Сервитут</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="label">Буфер (для линий), м</span>
+          <input type="number" id="zouit_buffer" value="20" min="0" step="5" />
+        </div>
+        <div class="ctx-import-row">
+          <button id="zouit_draw_btn" class="btn">✏️ Нарисовать зону</button>
+          <button id="zouit_import_btn" class="btn">📂 Импорт GeoJSON</button>
+        </div>
+        <input type="file" id="zouit_file_input" accept=".geojson,.json" hidden />
+        <button id="zouit_calc_btn" class="btn" style="margin-top:var(--sp-2)">⚡ Рассчитать конфликты</button>
+        <p class="hint">ЗОУИТ ограничивают строительство. Конфликты со зданиями отображаются в «Результате».</p>
       </div>
 
       <!-- Пресеты -->

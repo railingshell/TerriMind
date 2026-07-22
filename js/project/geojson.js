@@ -63,6 +63,46 @@ export function buildGeoJSON() {
   return { type: 'FeatureCollection', features };
 }
 
+/**
+ * Экспортировать контекстный слой как отдельную FeatureCollection.
+ * Используется при экспорте GeoJSON проекта.
+ */
+export function buildContextLayerGeoJSON() {
+  const features = state.contextLayer.map(obj => ({
+    type: 'Feature',
+    geometry: obj.geometry,
+    properties: {
+      id:              obj.id,
+      contextType:     obj.contextType,
+      label:           obj.label,
+      status:          obj.status,
+      capacity:        obj.capacity,
+      includeInBalance:obj.includeInBalance,
+      note:            obj.note
+    }
+  }));
+  return { type: 'FeatureCollection', name: 'ContextLayer', features };
+}
+
+/**
+ * Экспортировать ЗОУИТ как отдельную FeatureCollection.
+ */
+export function buildZouitGeoJSON() {
+  const features = state.zouitLayers.map(z => ({
+    type: 'Feature',
+    geometry: z.geometry,
+    properties: {
+      id:               z.id,
+      zouitType:        z.zouitType,
+      bufferM:          z.bufferM,
+      allowConstruction:z.allowConstruction,
+      allowRoads:       z.allowRoads,
+      note:             z.note
+    }
+  }));
+  return { type: 'FeatureCollection', name: 'ZOUIT', features };
+}
+
 // Разобрать FeatureCollection на группы по role
 export function parseGeoJSON(geojson) {
   const groups = { parcel: null, blocks: [], roads: [], axes: [], inner: [] };

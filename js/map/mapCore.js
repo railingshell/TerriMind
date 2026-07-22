@@ -29,6 +29,8 @@ function pane(name, z, noPointer) {
   if (noPointer) map.getPane(name).style.pointerEvents = 'none';
 }
 pane('roadsPane',      410);
+pane('zouitPane',      405);        // ЗОУИТ — под дорогами (фон)
+pane('contextPane',    408);        // контекстный слой окружения
 pane('blocksPane',     420);
 pane('courtyardsPane', 422, true);  // дворы — поверх кварталов, без pointer
 pane('plotsPane',      424);        // участки — поверх дворов
@@ -40,6 +42,8 @@ pane('editPane',       640, false);
 
 // Слои (FeatureGroup), добавлены в порядке отрисовки
 const drawnItems     = new L.FeatureGroup().addTo(map);   // участок
+const zouitLayer     = new L.FeatureGroup().addTo(map);   // ЗОУИТ
+const contextLayer   = new L.FeatureGroup().addTo(map);   // контекстный слой
 const roadsLayer     = new L.FeatureGroup().addTo(map);
 const blocksLayer    = new L.FeatureGroup().addTo(map);
 const courtyardsLayer= new L.FeatureGroup().addTo(map);   // дворы
@@ -52,6 +56,8 @@ const labelsLayer    = new L.FeatureGroup().addTo(map);
 export const mapCtx = {
   map,
   drawnItems,
+  zouitLayer,
+  contextLayer,
   roadsLayer,
   blocksLayer,
   courtyardsLayer,
