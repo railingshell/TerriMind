@@ -34,6 +34,7 @@ pane('courtyardsPane', 422, true);  // дворы — поверх кварта�
 pane('plotsPane',      424);        // участки — поверх дворов
 pane('buildingsPane',  426);        // здания — поверх участков
 pane('innerPane',      428);
+pane('socialPane',     440);        // социальные объекты — поверх всего контента
 pane('labelsPane',     430, true);
 pane('editPane',       640, false);
 
@@ -45,6 +46,7 @@ const courtyardsLayer= new L.FeatureGroup().addTo(map);   // дворы
 const plotsLayer     = new L.FeatureGroup().addTo(map);   // земельные участки
 const buildingsLayer = new L.FeatureGroup().addTo(map);   // здания
 const innerLayer     = new L.FeatureGroup().addTo(map);
+const socialLayer    = new L.FeatureGroup().addTo(map);   // соцобъекты + радиусы
 const labelsLayer    = new L.FeatureGroup().addTo(map);
 
 export const mapCtx = {
@@ -56,6 +58,7 @@ export const mapCtx = {
   plotsLayer,
   buildingsLayer,
   innerLayer,
+  socialLayer,
   labelsLayer
 };
 

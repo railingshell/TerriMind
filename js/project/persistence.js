@@ -31,8 +31,10 @@ export function buildProject(extra = {}) {
     version: PROJECT_FORMAT_VERSION,
     savedAt: new Date().toISOString(),
     params: collectParams(),
-    regulation:     getRegModel().serialize(),    // нормативные настройки
-    buildingParams: getBuildingParams(),          // параметры застройки (Промпт 1.3)
+    regulation:      getRegModel().serialize(),    // нормативные настройки
+    buildingParams:  getBuildingParams(),          // параметры застройки (Промпт 1.3)
+    socialObjects:   state.socialObjects.map(o => ({ id:o.id, type:o.type, name:o.name, lat:o.lat, lng:o.lng, capacity:o.capacity })),
+    contextObjects:  state.contextObjects.map(o => ({ id:o.id, type:o.type, name:o.name, lat:o.lat, lng:o.lng, capacity:o.capacity })),
     stats: {
       parcelArea: textOf('parcelArea'),
       blockCount: textOf('blockCount'),

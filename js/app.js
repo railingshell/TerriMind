@@ -21,9 +21,11 @@ import { initLicensePanel } from './ui/licensePanel.js';
 import { getRegModel } from './renderer/features/regulations/regModel.js';
 import { loadBuildingParams } from './project/params.js';
 import { initBuildingPanel } from './ui/buildingPanel.js';
+import { initSocialPanel, renderSocialLayer } from './ui/socialPanel.js';
 import { regenerateAllPlots } from './geometry/plotGenerator.js';
 import { generateAllBuildings } from './geometry/buildingGenerator.js';
 import { renderPlots, renderBuildings, renderCourtyards } from './map/render.js';
+import { recalcSocialBalance, setPopulation } from './domain/infrastructure/socialInfra.js';
 
 // ── Нормативные профили: загружаем из localStorage при старте ──
 getRegModel().loadProfiles();
@@ -78,6 +80,20 @@ initPresets();
 initLayersPanel();
 initLicensePanel();
 initBuildingPanel();
+initSocialPanel();
+
+// ── Социальная инфраструктура: обновление при изменении населения ──
+onEvent('metrics:update', (metrics) => {
+  const pop = (metrics && metrics.byId && metrics.byId.population) ? (metrics.byId.population.raw || 0) : 0;
+  setPopulation(pop);
+  recalcSocialBalance();   // emit SOCIAL_BALANCE_UPDATED → socialPanel обновится
+});
+
+// ── Социальный слой: обновить после загрузки проекта ──
+onEvent('geometry:loaded', () => {
+  renderSocialLayer();
+  recalcSocialBalance();
+});
 
 // ── Регенерация застройки по событию ──
 onEvent('buildings:regenerate', () => {

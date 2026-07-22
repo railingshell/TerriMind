@@ -11,6 +11,7 @@ import { attachParcelEditing } from '../map/parcelEdit.js';
 import { notifyError } from '../core/toast.js';
 import { getRegModel } from '../renderer/features/regulations/regModel.js';
 import { setBuildingParams } from './params.js';
+import { state } from '../core/state.js';
 
 const { drawnItems } = mapCtx;
 
@@ -86,6 +87,9 @@ export function loadProject(project) {
   if (project.buildingParams) {
     try { setBuildingParams(project.buildingParams); } catch (e) { /* пропускаем */ }
   }
+  // Социальная инфраструктура (Промпт 2.1–2.2)
+  if (Array.isArray(project.socialObjects))  state.socialObjects  = project.socialObjects.slice();
+  if (Array.isArray(project.contextObjects)) state.contextObjects = project.contextObjects.slice();
   if (project.geojson) loadGeoJSON(project.geojson);
   markSaved();
   return true;

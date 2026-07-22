@@ -21,6 +21,10 @@ export const state = {
   courtyards: {},          // { [blockId]: Feature }    — дворы
   buildings:  {},          // { [plotId]: Building }    — пятна зданий
 
+  // Социальная инфраструктура (Промпт 2.1–2.2)
+  socialObjects:   [],     // размещённые в проекте объекты { id, type, name, lat, lng, capacity }
+  contextObjects:  [],     // существующие объекты окружения { id, type, name, lat, lng, capacity }
+
   // Флаги
   dirty: false,            // несохранённые изменения
   showLabels: true,        // показывать номера кварталов
@@ -47,6 +51,8 @@ export function resetGenerated() {
 export function resetAll() {
   state.parcel = null;
   state.parcelFeature = null;
+  state.socialObjects  = [];
+  state.contextObjects = [];
   resetGenerated();
 }
 
