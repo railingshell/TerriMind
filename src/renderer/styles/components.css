@@ -1,0 +1,17 @@
+@layer components {
+  .toolbar-btn {
+    @apply flex items-center justify-center w-7 h-7 rounded text-tm-muted hover:text-tm-text hover:bg-tm-panel transition-colors;
+  }
+
+  .btn-primary {
+    @apply px-3 py-1.5 bg-tm-accent text-white rounded text-xs font-medium hover:bg-tm-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply px-3 py-1.5 bg-tm-panel text-tm-text border border-tm-border rounded text-xs font-medium hover:bg-tm-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .input-sm {
+    @apply px-2 py-1 bg-tm-panel text-tm-text border border-tm-border rounded text-xs outline-none focus:border-tm-accent focus:ring-1 focus:ring-tm-accent/30;
+  }
+}

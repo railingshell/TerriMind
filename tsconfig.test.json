@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "composite": false,
+    "types": ["jest", "node"],
+    "esModuleInterop": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@renderer/*": ["src/renderer/*"]
+    },
+    "skipLibCheck": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/shared/**/*",
+    "src/renderer/domain/**/*",
+    "src/renderer/services/**/*",
+    "src/renderer/store/**/*",
+    "src/renderer/workers/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "src/renderer/components/**/*",
+    "src/renderer/src/**/*",
+    "src/renderer/App.tsx",
+    "src/renderer/styles/**/*"
+  ]
+}
