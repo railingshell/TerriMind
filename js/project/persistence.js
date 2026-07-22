@@ -9,6 +9,7 @@ import { notifyOk, notifyError, notifyInfo } from '../core/toast.js';
 import { buildGeoJSON } from './geojson.js';
 import { collectParams } from './params.js';
 import { loadAny } from './loader.js';
+import { getRegModel } from '../renderer/features/regulations/regModel.js';
 
 export const PROJECT_FORMAT_VERSION = 2;
 const DRAFT_KEY = 'terrimind.draft';
@@ -29,6 +30,7 @@ export function buildProject(extra = {}) {
     version: PROJECT_FORMAT_VERSION,
     savedAt: new Date().toISOString(),
     params: collectParams(),
+    regulation: getRegModel().serialize(),   // нормативные настройки
     stats: {
       parcelArea: textOf('parcelArea'),
       blockCount: textOf('blockCount'),

@@ -9,6 +9,7 @@ import { renderAll } from '../map/render.js';
 import { updateParcelArea, updateStats } from './stats.js';
 import { attachParcelEditing } from '../map/parcelEdit.js';
 import { notifyError } from '../core/toast.js';
+import { getRegModel } from '../renderer/features/regulations/regModel.js';
 
 const { drawnItems } = mapCtx;
 
@@ -77,6 +78,10 @@ export function loadProject(project) {
     return false;
   }
   applyParams(project.params);
+  // Восстанавливаем нормативные настройки (если они были сохранены в файле)
+  if (project.regulation) {
+    try { getRegModel().deserialize(project.regulation); } catch (e) { /* старый формат — пропускаем */ }
+  }
   if (project.geojson) loadGeoJSON(project.geojson);
   markSaved();
   return true;
