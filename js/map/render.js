@@ -99,13 +99,14 @@ export function renderInner() {
   }
 }
 
-// Полная перерисовка сгенерированной геометрии
+// Полная перерисовка сгенерированной геометрии.
+// Намеренно НЕ эмитит stats:update — вызывающий код (drawTools, loader)
+// сам вызывает updateStats() после renderAll(), что исключает двойной пересчёт.
 export function renderAll() {
   renderRoads();
   redrawBlocks();
   renderInner();
   renderLabels();
-  emit('stats:update');
 }
 
 export function clearRenderLayers() {
