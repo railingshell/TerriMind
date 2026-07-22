@@ -1,7 +1,7 @@
 // app.js — точка входа. Инициализирует модули и связывает UI.
 // Заменяет прежний монолит map.js. Загружается как <script type="module">.
 
-import './map/mapCore.js';
+import { mapCtx } from './map/mapCore.js';
 import { state, markDirty } from './core/state.js';
 import { on as onEvent } from './core/events.js';
 import { $, on } from './core/dom.js';
@@ -137,8 +137,7 @@ on('zouit_draw_btn', 'click', () => {
   const type = sel.value;
   const bufM = buf ? parseInt(buf.value, 10) || 20 : 20;
   // Начинаем рисовать полигон; ЗОУИТ добавится после L.Draw.Event.CREATED
-  const { mapCtx: mc } = { mapCtx };
-  notifyInfo && notifyInfo('Нарисуйте зону ЗОУИТ на карте');
+  notifyInfo('Нарисуйте зону ЗОУИТ на карте');
   window.__pendingZouitType = type;
   window.__pendingZouitBuf  = bufM;
   new L.Draw.Polygon(mapCtx.map, { shapeOptions: { color: '#e74c3c', weight: 2 } }).enable();
