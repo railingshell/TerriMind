@@ -30,23 +30,29 @@ import { recalcSocialBalance, setPopulation } from './domain/infrastructure/soci
 import { renderContextLayer, addContextObject, importContextFromGeoJSON, startDrawingContext, initContextLayer, CONTEXT_TYPES } from './map/contextLayer.js';
 import { renderZouit, computeZouitConflicts, addZouit, importZouitFromGeoJSON, initZouit } from './domain/zouit.js';
 
+// ── ДИАГНОСТИКА: логируем каждый шаг инициализации ──────────────────────
+const _diag = (step) => console.log(`%c[TerriMind app.js] ${step}`, 'color:#3498db');
+const _diagErr = (step, err) => console.error(`[TerriMind app.js] FAIL: ${step}`, err);
+
+_diag('imports loaded, mapCtx=' + (mapCtx ? 'OK' : 'UNDEFINED'));
+_diag('mapCtx.map=' + (mapCtx && mapCtx.map ? 'OK' : 'UNDEFINED'));
+// ─────────────────────────────────────────────────────────────────────────
+
 // ── Нормативные профили: загружаем из localStorage при старте ──
-getRegModel().loadProfiles();
+try { getRegModel().loadProfiles(); _diag('loadProfiles OK'); } catch(e) { _diagErr('loadProfiles', e); }
 // ── Параметры застройки: загружаем из localStorage ──
-loadBuildingParams();
+try { loadBuildingParams(); _diag('loadBuildingParams OK'); } catch(e) { _diagErr('loadBuildingParams', e); }
 // ── Инициализируем модули требующие mapCtx (после импортов) ──
-initZouit(mapCtx);
-initContextLayer();
+try { initZouit(mapCtx); _diag('initZouit OK'); } catch(e) { _diagErr('initZouit', e); }
+try { initContextLayer(); _diag('initContextLayer OK'); } catch(e) { _diagErr('initContextLayer', e); }
 
 // ── Индикатор dirty + автосейв на каждое изменение ──
-initDirtyIndicator();
-// 'project:change' — каждое изменение → дебаунс автосейва
-// 'dirty:change'   — только переход состояния → UI/IPC (в dirtyIndicator)
+try { initDirtyIndicator(); _diag('initDirtyIndicator OK'); } catch(e) { _diagErr('initDirtyIndicator', e); }
 onEvent('project:change', scheduleAutosave);
 onEvent('stats:update', () => updateStats());
 
 // ── Инструменты рисования/генерации ──
-initDrawTools();
+try { initDrawTools(); _diag('initDrawTools OK'); } catch(e) { _diagErr('initDrawTools', e); }
 
 // ── Пересчёт ТЭП/dirty при смене параметров ──
 ['floors', 'buildCoef', 'residShare', 'areaPerPerson'].forEach((id) => {
@@ -82,11 +88,11 @@ on('exportPngBtn', 'click', exportPNG);
 on('exportPdfBtn', 'click', exportPDF);
 
 // ── Панели ──
-initPresets();
-initLayersPanel();
-initLicensePanel();
-initBuildingPanel();
-initSocialPanel();
+try { initPresets();       _diag('initPresets OK');      } catch(e) { _diagErr('initPresets', e); }
+try { initLayersPanel();   _diag('initLayersPanel OK');  } catch(e) { _diagErr('initLayersPanel', e); }
+try { initLicensePanel();  _diag('initLicensePanel OK'); } catch(e) { _diagErr('initLicensePanel', e); }
+try { initBuildingPanel(); _diag('initBuildingPanel OK');} catch(e) { _diagErr('initBuildingPanel', e); }
+try { initSocialPanel();   _diag('initSocialPanel OK');  } catch(e) { _diagErr('initSocialPanel', e); }
 
 // ── Социальная инфраструктура: обновление при изменении населения ──
 onEvent('metrics:update', (metrics) => {
@@ -204,9 +210,10 @@ if (window.terrimind && window.terrimind.onRequestSaveBeforeClose) {
 }
 
 // ── Начальная синхронизация ──
-updateParcelArea();
-updateStats();
-syncButtons();
+try { updateParcelArea(); _diag('updateParcelArea OK'); } catch(e) { _diagErr('updateParcelArea', e); }
+try { updateStats();      _diag('updateStats OK');      } catch(e) { _diagErr('updateStats', e); }
+try { syncButtons();      _diag('syncButtons OK');      } catch(e) { _diagErr('syncButtons', e); }
+_diag('=== app.js initialization COMPLETE ===');
 
 // ── Восстановление после сбоя (черновик) ──
 window.addEventListener('load', () => { checkRecovery(); });
