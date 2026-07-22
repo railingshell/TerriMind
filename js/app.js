@@ -18,6 +18,10 @@ import { initPresets } from './ui/presetsPanel.js';
 import { initLayersPanel } from './ui/layersPanel.js';
 import { initDirtyIndicator } from './ui/dirtyIndicator.js';
 import { initLicensePanel } from './ui/licensePanel.js';
+import { getRegModel } from './renderer/features/regulations/regModel.js';
+
+// ── Нормативные профили: загружаем из localStorage при старте ──
+getRegModel().loadProfiles();
 
 // ── Индикатор dirty + автосейв на каждое изменение ──
 initDirtyIndicator();
